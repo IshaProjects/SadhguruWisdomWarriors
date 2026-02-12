@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { RbacProvider } from './context/RbacContext.jsx';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -12,14 +13,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <App />
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              className: '!bg-dark-800 !text-dark-100 !border !border-dark-700',
-              duration: 3000,
-            }}
-          />
+          <RbacProvider>
+            <App />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                className: '!bg-dark-800 !text-dark-100 !border !border-dark-700',
+                duration: 3000,
+              }}
+            />
+          </RbacProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

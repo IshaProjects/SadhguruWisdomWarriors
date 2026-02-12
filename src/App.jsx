@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
+import { useRbac } from './context/RbacContext.jsx';
 import Layout from './components/layout/Layout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
@@ -9,6 +10,7 @@ import ChannelDetailPage from './pages/ChannelDetailPage.jsx';
 import ImportPage from './pages/ImportPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import RbacConfigPage from './pages/RbacConfigPage.jsx';
 import LoadingSpinner from './components/common/LoadingSpinner.jsx';
 
 function ProtectedRoute({ children }) {
@@ -24,6 +26,20 @@ function PublicRoute({ children }) {
 
   if (loading) return <LoadingSpinner size="lg" />;
   if (user) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+/**
+ * Guard a route by its RBAC page key.
+ * If the user's role doesn't have access, redirect to /dashboard.
+ */
+function RbacRoute({ pageKey, children }) {
+  const { canAccessPage } = useRbac();
+
+  if (!canAccessPage(pageKey)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }
 
@@ -55,11 +71,12 @@ export default function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/channels" element={<ChannelsPage />} />
-        <Route path="/channels/import" element={<ImportPage />} />
-        <Route path="/channels/:id" element={<ChannelDetailPage />} />
-        <Route path="/sync" element={<SyncPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/channels" element={<RbacRoute pageKey="channels"><ChannelsPage /></RbacRoute>} />
+        <Route path="/channels/import" element={<RbacRoute pageKey="import"><ImportPage /></RbacRoute>} />
+        <Route path="/channels/:id" element={<RbacRoute pageKey="channels"><ChannelDetailPage /></RbacRoute>} />
+        <Route path="/sync" element={<RbacRoute pageKey="sync"><SyncPage /></RbacRoute>} />
+        <Route path="/settings" element={<RbacRoute pageKey="settings"><SettingsPage /></RbacRoute>} />
+        <Route path="/settings/rbac" element={<RbacConfigPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

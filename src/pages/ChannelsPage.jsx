@@ -9,11 +9,13 @@ import EditChannelModal from '../components/channels/EditChannelModal.jsx';
 import FilterBar from '../components/common/FilterBar.jsx';
 import Pagination from '../components/common/Pagination.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
+import { useRbac } from '../context/RbacContext.jsx';
 import api from '../services/api.js';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 export default function ChannelsPage() {
+  const { canPerformAction } = useRbac();
   const [channels, setChannels] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -147,29 +149,37 @@ export default function ChannelsPage() {
               </button>
             </div>
 
-            <button onClick={handleExport} className="btn-ghost text-sm flex items-center gap-1.5">
-              <Download className="w-4 h-4" /> Export
-            </button>
+            {canPerformAction('channels.export') && (
+              <button onClick={handleExport} className="btn-ghost text-sm flex items-center gap-1.5">
+                <Download className="w-4 h-4" /> Export
+              </button>
+            )}
 
-            <button
-              onClick={handleSyncAll}
-              disabled={syncing}
-              className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <RefreshCw className={clsx('w-4 h-4', syncing && 'animate-spin')} />
-              Sync All
-            </button>
+            {canPerformAction('channels.sync') && (
+              <button
+                onClick={handleSyncAll}
+                disabled={syncing}
+                className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <RefreshCw className={clsx('w-4 h-4', syncing && 'animate-spin')} />
+                Sync All
+              </button>
+            )}
 
-            <Link to="/channels/import" className="btn-secondary text-sm flex items-center gap-1.5">
-              <Upload className="w-4 h-4" /> Import
-            </Link>
+            {canPerformAction('channels.import') && (
+              <Link to="/channels/import" className="btn-secondary text-sm flex items-center gap-1.5">
+                <Upload className="w-4 h-4" /> Import
+              </Link>
+            )}
 
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary text-sm flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" /> Add Channel
-            </button>
+            {canPerformAction('channels.add') && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="btn-primary text-sm flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Add Channel
+              </button>
+            )}
           </div>
         </div>
 
@@ -180,8 +190,8 @@ export default function ChannelsPage() {
           <div className="glass-card overflow-hidden">
             <ChannelTable
               channels={channels}
-              onEdit={(ch) => setEditingChannel(ch)}
-              onDelete={(ch) => setDeletingChannel(ch)}
+              onEdit={canPerformAction('channels.edit') ? (ch) => setEditingChannel(ch) : null}
+              onDelete={canPerformAction('channels.delete') ? (ch) => setDeletingChannel(ch) : null}
             />
           </div>
         ) : (

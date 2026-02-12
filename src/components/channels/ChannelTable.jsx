@@ -11,6 +11,7 @@ const statusBadge = {
 
 export default function ChannelTable({ channels, onEdit, onDelete }) {
   const navigate = useNavigate();
+  const showActions = !!(onEdit || onDelete);
 
   return (
     <div className="overflow-x-auto">
@@ -25,7 +26,9 @@ export default function ChannelTable({ channels, onEdit, onDelete }) {
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Status</th>
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Owner</th>
             <th className="text-right py-3 px-3 text-dark-400 font-medium">Last Synced</th>
-            <th className="text-right py-3 px-3 text-dark-400 font-medium">Actions</th>
+            {showActions && (
+              <th className="text-right py-3 px-3 text-dark-400 font-medium">Actions</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -69,37 +72,43 @@ export default function ChannelTable({ channels, onEdit, onDelete }) {
               <td className="py-3 px-3 text-right text-dark-400 text-sm">
                 {formatRelativeDate(ch.lastSyncedAt)}
               </td>
-              <td className="py-3 px-3 text-right">
-                <div className="inline-flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit?.(ch);
-                    }}
-                    className="p-1.5 rounded hover:bg-dark-700 text-dark-300"
-                    aria-label="Edit channel"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete?.(ch);
-                    }}
-                    className="p-1.5 rounded hover:bg-dark-800 text-red-400 hover:text-red-300"
-                    aria-label="Delete channel"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </td>
+              {showActions && (
+                <td className="py-3 px-3 text-right">
+                  <div className="inline-flex items-center gap-1">
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(ch);
+                        }}
+                        className="p-1.5 rounded hover:bg-dark-700 text-dark-300"
+                        aria-label="Edit channel"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(ch);
+                        }}
+                        className="p-1.5 rounded hover:bg-dark-800 text-red-400 hover:text-red-300"
+                        aria-label="Delete channel"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
           {channels.length === 0 && (
             <tr>
-              <td colSpan={9} className="py-12 text-center text-dark-400">
+              <td colSpan={showActions ? 9 : 8} className="py-12 text-center text-dark-400">
                 No channels found. Add your first channel to get started.
               </td>
             </tr>

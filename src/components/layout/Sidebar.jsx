@@ -7,20 +7,23 @@ import {
   LogOut,
   ChevronLeft,
   Youtube,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useRbac } from '../../context/RbacContext.jsx';
 import { useState } from 'react';
 import clsx from 'clsx';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/channels', icon: Tv2, label: 'Channels' },
-  { to: '/sync', icon: RefreshCw, label: 'Sync Status' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', rbacKey: 'dashboard' },
+  { to: '/channels', icon: Tv2, label: 'Channels', rbacKey: 'channels' },
+  { to: '/sync', icon: RefreshCw, label: 'Sync Status', rbacKey: 'sync' },
+  { to: '/settings', icon: Settings, label: 'Settings', rbacKey: 'settings' },
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { canAccessPage } = useRbac();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -49,7 +52,9 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-4 px-2 space-y-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {navItems
+          .filter(({ rbacKey }) => canAccessPage(rbacKey))
+          .map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
@@ -66,6 +71,24 @@ export default function Sidebar() {
             {!collapsed && <span className="text-sm font-medium">{label}</span>}
           </NavLink>
         ))}
+
+        {/* Admin-only RBAC link */}
+        {user?.role === 'admin' && (
+          <NavLink
+            to="/settings/rbac"
+            className={({ isActive }) =>
+              clsx(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 group',
+                isActive
+                  ? 'bg-accent-500/10 text-accent-400'
+                  : 'text-dark-400 hover:text-dark-100 hover:bg-dark-800'
+              )
+            }
+          >
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">RBAC Config</span>}
+          </NavLink>
+        )}
       </nav>
 
       {/* User */}
