@@ -1,0 +1,70 @@
+import { useNavigate } from 'react-router-dom';
+import { formatNumber } from '../../utils/formatters.js';
+import clsx from 'clsx';
+
+const statusColors = {
+  active: 'bg-success/20 text-success',
+  paused: 'bg-warning/20 text-warning',
+  archived: 'bg-dark-600/20 text-dark-400',
+};
+
+export default function ChannelCard({ channel }) {
+  const navigate = useNavigate();
+
+  return (
+    <div
+      onClick={() => navigate(`/channels/${channel._id}`)}
+      className="glass-card p-4 cursor-pointer hover:border-accent-500/30 transition-all duration-200 group"
+    >
+      <div className="flex items-start gap-3">
+        <img
+          src={channel.thumbnailUrl}
+          alt=""
+          className="w-12 h-12 rounded-full object-cover bg-dark-700 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium truncate group-hover:text-accent-400 transition-colors">
+            {channel.title}
+          </h3>
+          <p className="text-xs text-dark-400 truncate">
+            {channel.customUrl || channel.youtubeChannelId}
+          </p>
+        </div>
+        <span className={clsx('badge text-[10px]', statusColors[channel.status])}>
+          {channel.status}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        <div>
+          <p className="text-xs text-dark-400">Subs</p>
+          <p className="text-sm font-semibold">
+            {formatNumber(channel.currentStats?.subscribers)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-dark-400">Views</p>
+          <p className="text-sm font-semibold">
+            {formatNumber(channel.currentStats?.views)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-dark-400">Videos</p>
+          <p className="text-sm font-semibold">
+            {formatNumber(channel.currentStats?.videoCount)}
+          </p>
+        </div>
+      </div>
+
+      {channel.tags?.length > 0 && (
+        <div className="flex gap-1 mt-3 flex-wrap">
+          {channel.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="badge bg-dark-700 text-dark-300 text-[10px]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
