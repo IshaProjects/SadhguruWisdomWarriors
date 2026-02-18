@@ -13,7 +13,14 @@ import api from '../services/api.js';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
-  const [filters, setFilters] = useState({ period: '30d', category: '', tags: '', status: '' });
+  const [filters, setFilters] = useState({
+    period: '30d',
+    category: '',
+    tags: '',
+    status: '',
+    startDate: '',
+    endDate: '',
+  });
   const [summary, setSummary] = useState(null);
   const [growthData, setGrowthData] = useState([]);
   const [topChannelsBySubs, setTopChannelsBySubs] = useState([]);
@@ -26,8 +33,13 @@ export default function DashboardPage() {
   const buildParams = () => {
     const params = { period: filters.period };
     if (filters.category) params.category = filters.category;
-    if (filters.tags) params.tags = filters.tags;
+    const tagsTrimmed = filters.tags?.trim?.();
+    if (tagsTrimmed) params.tags = tagsTrimmed;
     if (filters.status) params.status = filters.status;
+    if (filters.startDate && filters.endDate) {
+      params.startDate = filters.startDate;
+      params.endDate = filters.endDate;
+    }
     return params;
   };
 
@@ -71,7 +83,12 @@ export default function DashboardPage() {
       <TopBar title="Dashboard" />
       <div className="p-6 space-y-6">
         {/* Filters */}
-        <FilterBar filters={filters} onFilterChange={setFilters} />
+        <FilterBar
+          filters={filters}
+          onFilterChange={setFilters}
+          showPeriod={true}
+          showDateRange={true}
+        />
 
         {/* Summary Cards */}
         {summary && (

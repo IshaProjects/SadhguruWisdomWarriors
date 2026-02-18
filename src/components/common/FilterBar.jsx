@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Filter, X } from 'lucide-react';
+import { Filter, X, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 
 const periods = [
@@ -23,12 +23,25 @@ const categories = [
 
 const statuses = ['All', 'active', 'paused', 'archived'];
 
-export default function FilterBar({ filters, onFilterChange, showPeriod = true }) {
+export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false }) {
   const [showFilters, setShowFilters] = useState(false);
 
   const updateFilter = (key, value) => {
-    onFilterChange({ ...filters, [key]: value === 'All' ? '' : value });
+    const next = { ...filters, [key]: value === 'All' ? '' : value };
+    // When selecting a period tab, clear custom date range so API uses the tab's period
+    if (key === 'period') {
+      next.startDate = '';
+      next.endDate = '';
+    }
+    onFilterChange(next);
   };
+
+  const clearDateRange = () => {
+    onFilterChange({ ...filters, startDate: '', endDate: '' });
+  };
+
+  const isPeriodActive = (periodValue) =>
+    filters.period === periodValue && !(filters.startDate && filters.endDate);
 
   return (
     <div className="space-y-3">
@@ -38,10 +51,11 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true }
             {periods.map((p) => (
               <button
                 key={p.value}
+                type="button"
                 onClick={() => updateFilter('period', p.value)}
                 className={clsx(
                   'px-3 py-1.5 text-sm rounded-md transition-colors',
-                  filters.period === p.value
+                  isPeriodActive(p.value)
                     ? 'bg-accent-500 text-white'
                     : 'text-dark-400 hover:text-dark-100'
                 )}
@@ -49,6 +63,37 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true }
                 {p.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {showDateRange && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="w-4 h-4 text-dark-400 shrink-0" />
+            <input
+              type="date"
+              value={filters.startDate || ''}
+              onChange={(e) => updateFilter('startDate', e.target.value)}
+              className="input-field text-sm py-1.5 w-40"
+              max={filters.endDate || undefined}
+            />
+            <span className="text-dark-500 text-sm">to</span>
+            <input
+              type="date"
+              value={filters.endDate || ''}
+              onChange={(e) => updateFilter('endDate', e.target.value)}
+              className="input-field text-sm py-1.5 w-40"
+              min={filters.startDate || undefined}
+            />
+            {(filters.startDate || filters.endDate) && (
+              <button
+                type="button"
+                onClick={clearDateRange}
+                className="btn-ghost text-xs p-1.5 text-dark-400 hover:text-dark-200"
+                title="Clear date range"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         )}
 
@@ -65,13 +110,15 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true }
 
         {/* Active filter tags */}
         {Object.entries(filters).map(([key, value]) => {
-          if (!value || key === 'period') return null;
+          if (key === 'period' || key === 'startDate' || key === 'endDate') return null;
+          const str = typeof value === 'string' ? value.trim() : value;
+          if (!str) return null;
           return (
             <span
               key={key}
               className="badge bg-accent-500/20 text-accent-300 gap-1"
             >
-              {key}: {value}
+              {key}: {typeof value === 'string' ? value.trim() : value}
               <button onClick={() => updateFilter(key, '')}>
                 <X className="w-3 h-3" />
               </button>

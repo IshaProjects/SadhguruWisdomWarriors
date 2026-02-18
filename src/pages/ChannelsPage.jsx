@@ -38,7 +38,8 @@ export default function ChannelsPage() {
       };
       if (search) params.search = search;
       if (filters.category) params.category = filters.category;
-      if (filters.tags) params.tags = filters.tags;
+      const tagsTrimmed = filters.tags?.trim?.();
+      if (tagsTrimmed) params.tags = tagsTrimmed;
       if (filters.status) params.status = filters.status;
 
       const res = await api.get('/channels', { params });
