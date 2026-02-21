@@ -76,7 +76,7 @@ export default function ChannelMetricsTable({ data, tooltip }) {
   const [sortCol,  setSortCol]  = useState('subscribers');
   const [sortDir,  setSortDir]  = useState('desc');
   const [page,     setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
 
   const { setTileHeight } = useLayoutContext() ?? {};
 
