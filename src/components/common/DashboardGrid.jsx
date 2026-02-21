@@ -10,6 +10,14 @@ import { DEFAULT_LAYOUTS, COLS, BREAKPOINTS } from './dashboardLayouts.js';
 export const EditModeContext = createContext(false);
 export const useEditMode = () => useContext(EditModeContext);
 
+/**
+ * LayoutContext — lets child widgets programmatically resize a grid tile.
+ * setTileHeight(id, h) updates the `h` value for the named tile across all
+ * breakpoints, pushing everything below it down automatically.
+ */
+export const LayoutContext = createContext(null);
+export const useLayoutContext = () => useContext(LayoutContext);
+
 // Inner grid component that has access to measured container width
 function GridInner({ children, editMode, layouts, onLayoutChange }) {
   const { width, containerRef } = useContainerWidth({ initialWidth: 1200 });
@@ -106,6 +114,23 @@ export default function DashboardGrid({ children }) {
     setEditMode(false);
   };
 
+  /**
+   * Programmatically resize a tile to `h` grid rows across all breakpoints.
+   * Used by content-driven widgets (e.g. ChannelMetricsTable) to push siblings
+   * below them when their content grows.
+   */
+  const setTileHeight = useCallback((id, h) => {
+    setLayouts((prev) => {
+      const next = {};
+      for (const bp of Object.keys(prev)) {
+        next[bp] = prev[bp].map((item) =>
+          item.i === id ? { ...item, h: Math.max(h, item.minH ?? 2) } : item
+        );
+      }
+      return next;
+    });
+  }, []);
+
   const handleResetPreview = () => {
     setLayouts(DEFAULT_LAYOUTS);
   };
@@ -129,6 +154,7 @@ export default function DashboardGrid({ children }) {
   if (!loaded) return null;
 
   return (
+    <LayoutContext.Provider value={{ setTileHeight }}>
     <EditModeContext.Provider value={editMode}>
       <div className="relative">
 
@@ -250,5 +276,6 @@ export default function DashboardGrid({ children }) {
         </GridInner>
       </div>
     </EditModeContext.Provider>
+    </LayoutContext.Provider>
   );
 }

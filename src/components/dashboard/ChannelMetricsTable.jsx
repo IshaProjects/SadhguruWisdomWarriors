@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { formatNumber } from '../../utils/formatters.js';
 import { exportToCsv } from '../../utils/exportCsv.js';
 import InfoTooltip from '../common/InfoTooltip.jsx';
+import { useLayoutContext } from '../common/DashboardGrid.jsx';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,11 +65,20 @@ const PAGE_SIZE_OPTIONS = [5, 20, 50, 100, 200];
 
 // ── component ─────────────────────────────────────────────────────────────────
 
+// Grid geometry constants (must match DashboardGrid rowHeight + margin)
+const ROW_HEIGHT    = 80;   // px per grid row
+const ROW_MARGIN    = 16;   // vertical margin between rows (px)
+const GRID_UNIT     = ROW_HEIGHT + ROW_MARGIN;  // 96 px per h-unit
+const PX_PER_ROW    = 44;   // approximate px per table data row
+const HEADER_UNITS  = 3;    // toolbar + table-header + legend overhead in grid units
+
 export default function ChannelMetricsTable({ data, tooltip }) {
   const [sortCol,  setSortCol]  = useState('subscribers');
   const [sortDir,  setSortDir]  = useState('desc');
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  const { setTileHeight } = useLayoutContext() ?? {};
 
   // Pre-sort arrays for percentile ranking (descending for all four metrics)
   const ranks = useMemo(() => {
@@ -97,6 +107,16 @@ export default function ChannelMetricsTable({ data, tooltip }) {
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   const pageData   = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  // Dynamically resize the grid tile so that the full page of rows is visible
+  // without internal scrolling, and the widget below it gets pushed down.
+  useEffect(() => {
+    if (!setTileHeight) return;
+    const visibleRows = pageData.length;
+    const contentPx   = visibleRows * PX_PER_ROW;
+    const neededH     = Math.ceil(contentPx / GRID_UNIT) + HEADER_UNITS;
+    setTileHeight('channelmetrics', Math.max(neededH, 4));
+  }, [pageData.length, setTileHeight]);
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
