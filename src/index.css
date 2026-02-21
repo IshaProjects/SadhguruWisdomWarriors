@@ -66,7 +66,140 @@
   }
 }
 
-/* Count-up animation */
+/* ── react-grid-layout overrides ───────────────────────────────────────── */
+
+/* Drop placeholder */
+.react-grid-placeholder {
+  background: rgba(99, 102, 241, 0.15) !important;
+  border: 2px dashed rgba(99, 102, 241, 0.5) !important;
+  border-radius: 12px !important;
+  opacity: 1 !important;
+}
+
+/* Edit-mode: highlight each tile */
+.rgl-edit-mode .react-grid-item {
+  border-radius: 12px;
+  outline: 1px dashed rgba(99, 102, 241, 0.35);
+  outline-offset: 2px;
+  transition: outline 0.15s;
+}
+
+.rgl-edit-mode .react-grid-item:hover {
+  outline-color: rgba(99, 102, 241, 0.7);
+}
+
+/* ── Resize handles (all 8 directions) ──────────────────────────────────── */
+
+/* Base: clear browser default and set common size */
+.react-resizable-handle {
+  background-image: none !important;
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+}
+
+/* Corner handles — 12×12 touch targets */
+.react-resizable-handle-se,
+.react-resizable-handle-sw,
+.react-resizable-handle-ne,
+.react-resizable-handle-nw {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Edge handles — thin bars spanning most of the edge */
+.react-resizable-handle-e,
+.react-resizable-handle-w {
+  width: 6px !important;
+  height: calc(100% - 28px) !important;
+  top: 14px !important;
+  cursor: ew-resize;
+}
+.react-resizable-handle-s,
+.react-resizable-handle-n {
+  height: 6px !important;
+  width: calc(100% - 28px) !important;
+  left: 14px !important;
+  cursor: ns-resize;
+}
+
+/* Corner positioning */
+.react-resizable-handle-se { bottom: 0 !important; right: 0 !important; cursor: se-resize; }
+.react-resizable-handle-sw { bottom: 0 !important; left:  0 !important; cursor: sw-resize; }
+.react-resizable-handle-ne { top:    0 !important; right: 0 !important; cursor: ne-resize; }
+.react-resizable-handle-nw { top:    0 !important; left:  0 !important; cursor: nw-resize; }
+.react-resizable-handle-e  { right:  0 !important; }
+.react-resizable-handle-w  { left:   0 !important; }
+.react-resizable-handle-s  { bottom: 0 !important; }
+.react-resizable-handle-n  { top:    0 !important; }
+
+/* Visual indicator on all handles — accent-coloured line/dot */
+.rgl-edit-mode .react-resizable-handle::after {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: rgba(99, 102, 241, 0);
+  transition: background 0.15s;
+}
+.rgl-edit-mode .react-resizable-handle:hover::after {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* Corner notch — visible marker at each corner */
+.rgl-edit-mode .react-resizable-handle-se::before,
+.rgl-edit-mode .react-resizable-handle-sw::before,
+.rgl-edit-mode .react-resizable-handle-ne::before,
+.rgl-edit-mode .react-resizable-handle-nw::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(99, 102, 241, 0.55);
+}
+.rgl-edit-mode .react-resizable-handle-se::before { bottom: 3px; right:  3px; }
+.rgl-edit-mode .react-resizable-handle-sw::before { bottom: 3px; left:   3px; }
+.rgl-edit-mode .react-resizable-handle-ne::before { top:    3px; right:  3px; }
+.rgl-edit-mode .react-resizable-handle-nw::before { top:    3px; left:   3px; }
+
+/* Edge bar — visible accent line along each edge */
+.rgl-edit-mode .react-resizable-handle-e::before,
+.rgl-edit-mode .react-resizable-handle-w::before,
+.rgl-edit-mode .react-resizable-handle-s::before,
+.rgl-edit-mode .react-resizable-handle-n::before {
+  content: '';
+  position: absolute;
+  border-radius: 99px;
+  background: rgba(99, 102, 241, 0.4);
+  transition: background 0.15s;
+}
+.rgl-edit-mode .react-resizable-handle-e::before,
+.rgl-edit-mode .react-resizable-handle-w::before {
+  width: 3px; height: 30px;
+  top: 50%; transform: translateY(-50%);
+  left: 50%; margin-left: -1.5px;
+}
+.rgl-edit-mode .react-resizable-handle-s::before,
+.rgl-edit-mode .react-resizable-handle-n::before {
+  height: 3px; width: 30px;
+  left: 50%; transform: translateX(-50%);
+  top: 50%; margin-top: -1.5px;
+}
+.rgl-edit-mode .react-resizable-handle-e:hover::before,
+.rgl-edit-mode .react-resizable-handle-w:hover::before,
+.rgl-edit-mode .react-resizable-handle-s:hover::before,
+.rgl-edit-mode .react-resizable-handle-n:hover::before {
+  background: rgba(99, 102, 241, 0.8);
+}
+
+/* Show expand button on group hover */
+.group:hover .group-hover\:opacity-100 {
+  opacity: 1;
+}
+
+/* ── Count-up animation ─────────────────────────────────────────────────── */
 @keyframes countUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

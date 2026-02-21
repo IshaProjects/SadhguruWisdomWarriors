@@ -9,6 +9,7 @@ import {
   Calendar,
   ExternalLink,
   Save,
+  TrendingUp,
 } from 'lucide-react';
 import {
   LineChart,
@@ -38,6 +39,8 @@ export default function ChannelDetailPage() {
   const [channel, setChannel] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [videoTrends, setVideoTrends] = useState(null);
+  const [trendPeriod, setTrendPeriod] = useState('30');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -65,6 +68,25 @@ export default function ChannelDetailPage() {
     };
     fetchChannel();
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchVideoTrends = async () => {
+      try {
+        const start = new Date();
+        start.setDate(start.getDate() - parseInt(trendPeriod));
+        const startDate = start.toISOString().slice(0, 10);
+        const res = await api.get(`/video-snapshots/channel/${id}`, {
+          params: { startDate },
+        });
+        setVideoTrends(res.data);
+      } catch {
+        // Silently fail — no snapshots yet is expected
+        setVideoTrends(null);
+      }
+    };
+    fetchVideoTrends();
+  }, [id, trendPeriod]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -242,6 +264,145 @@ export default function ChannelDetailPage() {
           </div>
         )}
 
+        {/* Video Trends */}
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-accent-400" />
+              <h3 className="text-sm font-medium text-dark-300">Video Trends</h3>
+            </div>
+            <div className="flex gap-1">
+              {[
+                { label: '7D',  value: '7'  },
+                { label: '30D', value: '30' },
+                { label: '90D', value: '90' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setTrendPeriod(opt.value)}
+                  className={clsx(
+                    'px-2.5 py-1 text-xs rounded font-medium transition-colors',
+                    trendPeriod === opt.value
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {videoTrends && videoTrends.dailyTrend.length > 0 ? (
+            <>
+              {/* Aggregated daily views chart */}
+              <div>
+                <p className="text-xs text-dark-400 mb-2">Total daily views across all videos</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={videoTrends.dailyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickFormatter={(d) => d.slice(5)}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickFormatter={formatNumber}
+                      width={55}
+                    />
+                    <Tooltip formatter={(v) => formatNumber(v)} />
+                    <Line
+                      type="monotone"
+                      dataKey="views"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Views"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top videos by views with mini trend */}
+              {videoTrends.topVideos.length > 0 && (
+                <div>
+                  <p className="text-xs text-dark-400 mb-2">Top videos by views in this period</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-dark-700">
+                          <th className="text-left py-2 px-2 text-dark-400 font-medium">Video</th>
+                          <th className="text-right py-2 px-2 text-dark-400 font-medium">Views (period)</th>
+                          <th className="text-right py-2 px-2 text-dark-400 font-medium">View Growth</th>
+                          <th className="text-right py-2 px-2 text-dark-400 font-medium">Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {videoTrends.topVideos.map((item) => (
+                          <tr key={item._id} className="border-b border-dark-800 hover:bg-dark-800/50">
+                            <td className="py-2.5 px-2">
+                              <div className="flex items-center gap-3">
+                                {item.video?.thumbnailUrl && (
+                                  <img
+                                    src={item.video.thumbnailUrl}
+                                    alt=""
+                                    className="w-14 h-8 rounded object-cover bg-dark-700 shrink-0"
+                                  />
+                                )}
+                                <a
+                                  href={`https://youtube.com/watch?v=${item.video?.youtubeVideoId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium truncate max-w-[220px] hover:text-accent-400 transition-colors"
+                                >
+                                  {item.video?.title || item._id}
+                                </a>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2 text-right">{formatNumber(item.totalViews)}</td>
+                            <td className="py-2.5 px-2 text-right">
+                              <span className={clsx(
+                                'font-medium',
+                                item.viewsGrowth >= 0 ? 'text-green-400' : 'text-red-400'
+                              )}>
+                                {item.viewsGrowth >= 0 ? '+' : ''}{formatNumber(item.viewsGrowth)}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-2 text-right">
+                              {item.dataPoints.length > 1 ? (
+                                <div className="inline-block w-24 h-8">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={item.dataPoints}>
+                                      <Line
+                                        type="monotone"
+                                        dataKey="views"
+                                        stroke="#f59e0b"
+                                        strokeWidth={1.5}
+                                        dot={false}
+                                      />
+                                    </LineChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              ) : (
+                                <span className="text-dark-500 text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="py-10 text-center text-dark-400 text-sm">
+              No video snapshot data yet. Run a sync to start collecting trend history.
+            </div>
+          )}
+        </div>
+
         {/* Internal Metadata (Edit) */}
         <div className="glass-card p-5">
           <div className="flex items-center justify-between mb-4">
@@ -341,32 +502,64 @@ export default function ChannelDetailPage() {
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Likes</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Comments</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Eng. Rate</th>
+                  <th
+                    className="text-right py-2 px-2 text-dark-400 font-medium cursor-help"
+                    title="Outlier Score = video views ÷ channel average views. >1.5× is an outlier hit; <0.5× is an underperformer."
+                  >
+                    Outlier Score
+                  </th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Duration</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Published</th>
                 </tr>
               </thead>
               <tbody>
-                {videos.map((v) => (
-                  <tr key={v._id} className="border-b border-dark-800 hover:bg-dark-800/50">
-                    <td className="py-2.5 px-2">
-                      <div className="flex items-center gap-3">
-                        <img src={v.thumbnailUrl} alt="" className="w-16 h-9 rounded object-cover bg-dark-700 shrink-0" />
-                        <span className="font-medium truncate max-w-[250px]">{v.title}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-2 text-right">{formatNumber(v.views)}</td>
-                    <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.likes)}</td>
-                    <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.comments)}</td>
-                    <td className="py-2.5 px-2 text-right text-dark-300">
-                      {engagementRate(v.views, v.likes, v.comments).toFixed(2)}%
-                    </td>
-                    <td className="py-2.5 px-2 text-right text-dark-400">{formatDuration(v.duration)}</td>
-                    <td className="py-2.5 px-2 text-right text-dark-400">{formatRelativeDate(v.publishedAt)}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const avgViews = videos.length
+                    ? videos.reduce((s, v) => s + (v.views || 0), 0) / videos.length
+                    : 0;
+                  return videos.map((v) => {
+                    const score = avgViews > 0 ? v.views / avgViews : null;
+                    const scoreBadge = (() => {
+                      if (score == null) return null;
+                      if (score >= 3)    return { label: `${score.toFixed(1)}×`, cls: 'bg-green-500/20 text-green-300' };
+                      if (score >= 1.5)  return { label: `${score.toFixed(1)}×`, cls: 'bg-emerald-500/15 text-emerald-400' };
+                      if (score >= 0.75) return { label: `${score.toFixed(1)}×`, cls: 'bg-dark-700 text-dark-300' };
+                      if (score >= 0.5)  return { label: `${score.toFixed(1)}×`, cls: 'bg-yellow-500/15 text-yellow-400' };
+                      return              { label: `${score.toFixed(1)}×`, cls: 'bg-red-500/15 text-red-400' };
+                    })();
+                    return (
+                      <tr key={v._id} className="border-b border-dark-800 hover:bg-dark-800/50">
+                        <td className="py-2.5 px-2">
+                          <div className="flex items-center gap-3">
+                            <img src={v.thumbnailUrl} alt="" className="w-16 h-9 rounded object-cover bg-dark-700 shrink-0" />
+                            <span className="font-medium truncate max-w-[250px]">{v.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-2 text-right">{formatNumber(v.views)}</td>
+                        <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.likes)}</td>
+                        <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.comments)}</td>
+                        <td className="py-2.5 px-2 text-right text-dark-300">
+                          {engagementRate(v.views, v.likes, v.comments).toFixed(2)}%
+                        </td>
+                        <td className="py-2.5 px-2 text-right">
+                          {scoreBadge ? (
+                            <span
+                              className={clsx('inline-block px-2 py-0.5 rounded text-xs font-semibold tabular-nums', scoreBadge.cls)}
+                              title={`Channel avg: ${formatNumber(Math.round(avgViews))} views`}
+                            >
+                              {scoreBadge.label}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="py-2.5 px-2 text-right text-dark-400">{formatDuration(v.duration)}</td>
+                        <td className="py-2.5 px-2 text-right text-dark-400">{formatRelativeDate(v.publishedAt)}</td>
+                      </tr>
+                    );
+                  });
+                })()}
                 {videos.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-dark-400">
+                    <td colSpan={8} className="py-8 text-center text-dark-400">
                       No videos synced yet. Run a sync to fetch videos.
                     </td>
                   </tr>

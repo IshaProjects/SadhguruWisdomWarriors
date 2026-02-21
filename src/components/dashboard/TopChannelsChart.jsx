@@ -8,6 +8,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatNumber } from '../../utils/formatters.js';
+import InfoTooltip from '../common/InfoTooltip.jsx';
+import clsx from 'clsx';
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
@@ -22,16 +24,19 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-export default function TopChannelsChart({ data, dataKey, title, color = '#3b82f6' }) {
+export default function TopChannelsChart({ data, dataKey, title, color = '#3b82f6', tooltip, fullHeight }) {
   const chartData = data.map((d) => ({
     ...d,
     shortTitle: d.title?.length > 20 ? d.title.slice(0, 18) + '...' : d.title,
   }));
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-medium text-dark-300 mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={300}>
+    <div className={clsx('glass-card p-5', fullHeight && 'h-full flex flex-col')}>
+      <div className="flex items-center gap-1.5 mb-4 shrink-0">
+        <h3 className="text-sm font-medium text-dark-300">{title}</h3>
+        {tooltip && <InfoTooltip text={tooltip} side="top" />}
+      </div>
+      <ResponsiveContainer width="100%" height={fullHeight ? '100%' : 300}>
         <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
           <XAxis

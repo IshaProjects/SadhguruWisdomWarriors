@@ -7,6 +7,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import InfoTooltip from '../common/InfoTooltip.jsx';
+import clsx from 'clsx';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -20,13 +22,14 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function PublishingChart({ data }) {
+export default function PublishingChart({ data, tooltip, fullHeight }) {
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-medium text-dark-300 mb-4">
-        Publishing Frequency
-      </h3>
-      <ResponsiveContainer width="100%" height={280}>
+    <div className={clsx('glass-card p-5', fullHeight && 'h-full flex flex-col')}>
+      <div className="flex items-center gap-1.5 mb-4 shrink-0">
+        <h3 className="text-sm font-medium text-dark-300">Publishing Frequency</h3>
+        {tooltip && <InfoTooltip text={tooltip} side="top" />}
+      </div>
+      <ResponsiveContainer width="100%" height={fullHeight ? '100%' : 280}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
           <XAxis

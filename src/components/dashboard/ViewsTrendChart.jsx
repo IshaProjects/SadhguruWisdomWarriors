@@ -14,7 +14,10 @@ import { formatNumber } from '../../utils/formatters.js';
 import InfoTooltip from '../common/InfoTooltip.jsx';
 import clsx from 'clsx';
 
-const CustomTooltip = ({ active, payload, label, unit, color }) => {
+const COLOR_POS = '#8b5cf6';
+const COLOR_NEG = '#f87171';
+
+const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const value = payload[0]?.value ?? 0;
   const isPositive = value >= 0;
@@ -23,21 +26,21 @@ const CustomTooltip = ({ active, payload, label, unit, color }) => {
       <p className="text-xs text-dark-400 mb-1">{label}</p>
       <p
         className="text-sm font-semibold"
-        style={{ color: isPositive ? color : '#f87171' }}
+        style={{ color: isPositive ? COLOR_POS : COLOR_NEG }}
       >
-        {isPositive ? '+' : ''}{formatNumber(value)} {unit}
+        {isPositive ? '+' : ''}{formatNumber(value)} views
       </p>
     </div>
   );
 };
 
-export default function GrowthChart({ data, dataKey, title, color = '#3b82f6', unit = '', tooltip, fullHeight }) {
+export default function ViewsTrendChart({ data, dataKey = 'viewsDelta', tooltip, fullHeight }) {
   const hasNegative = data.some((d) => (d[dataKey] ?? 0) < 0);
 
   return (
     <div className={clsx('glass-card p-5', fullHeight && 'h-full flex flex-col')}>
       <div className="flex items-center gap-1.5 mb-4 shrink-0">
-        <h3 className="text-sm font-medium text-dark-300">{title}</h3>
+        <h3 className="text-sm font-medium text-dark-300">Views Trend</h3>
         {tooltip && <InfoTooltip text={tooltip} side="top" />}
       </div>
       <ResponsiveContainer width="100%" height={fullHeight ? '100%' : 280}>
@@ -55,15 +58,15 @@ export default function GrowthChart({ data, dataKey, title, color = '#3b82f6', u
             axisLine={{ stroke: '#334155' }}
             width={65}
           />
-          <Tooltip content={<CustomTooltip unit={unit} color={color} />} />
+          <Tooltip content={<CustomTooltip />} />
           {hasNegative && (
             <ReferenceLine y={0} stroke="#475569" strokeDasharray="4 2" />
           )}
-          <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} barSize={14} name={unit}>
+          <Bar dataKey={dataKey} radius={[3, 3, 0, 0]} barSize={14}>
             {data.map((entry, index) => (
               <Cell
                 key={index}
-                fill={(entry[dataKey] ?? 0) >= 0 ? color : '#f87171'}
+                fill={(entry[dataKey] ?? 0) >= 0 ? COLOR_POS : COLOR_NEG}
                 fillOpacity={0.85}
               />
             ))}
@@ -71,7 +74,7 @@ export default function GrowthChart({ data, dataKey, title, color = '#3b82f6', u
           <Line
             type="monotone"
             dataKey={dataKey}
-            stroke={color}
+            stroke={COLOR_POS}
             strokeWidth={2}
             dot={false}
             activeDot={false}
@@ -82,4 +85,3 @@ export default function GrowthChart({ data, dataKey, title, color = '#3b82f6', u
     </div>
   );
 }
-

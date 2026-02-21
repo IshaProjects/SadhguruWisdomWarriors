@@ -6,6 +6,8 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { RbacProvider } from './context/RbacContext.jsx';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
