@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Download, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import ChannelTable from '../components/channels/ChannelTable.jsx';
 import ChannelCard from '../components/channels/ChannelCard.jsx';
@@ -16,26 +16,27 @@ import clsx from 'clsx';
 
 export default function ChannelsPage() {
   const { canPerformAction } = useRbac();
-  const [channels, setChannels] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('table');
+  const [channels, setChannels]         = useState([]);
+  const [pagination, setPagination]     = useState({ page: 1, pages: 1, total: 0 });
+  const [loading, setLoading]           = useState(true);
+  const [viewMode, setViewMode]         = useState('table');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingChannel, setEditingChannel] = useState(null);
+  const [editingChannel, setEditingChannel]   = useState(null);
   const [deletingChannel, setDeletingChannel] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ period: '30d', category: '', tags: '', status: '' });
-  const [sort, setSort] = useState('-currentStats.subscribers');
-  const [syncing, setSyncing] = useState(false);
+  const [search, setSearch]     = useState('');
+  const [filters, setFilters]   = useState({ period: '30d', category: '', tags: '', status: '' });
+  const [sort, setSort]         = useState('-currentStats.subscribers');
+  const [syncing, setSyncing]   = useState(false);
+
+  // Bulk-select state
+  const [selectedIds, setSelectedIds]         = useState(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting]       = useState(false);
 
   const fetchChannels = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params = {
-        page,
-        limit: viewMode === 'grid' ? 24 : 25,
-        sort,
-      };
+      const params = { page, limit: viewMode === 'grid' ? 24 : 25, sort };
       if (search) params.search = search;
       if (filters.category) params.category = filters.category;
       const tagsTrimmed = filters.tags?.trim?.();
@@ -45,7 +46,7 @@ export default function ChannelsPage() {
       const res = await api.get('/channels', { params });
       setChannels(res.data.channels);
       setPagination(res.data.pagination);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load channels');
     } finally {
       setLoading(false);
@@ -54,8 +55,53 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     fetchChannels(1);
+    setSelectedIds(new Set()); // clear selection on filter/page change
   }, [fetchChannels]);
 
+  /* ── Single selection ── */
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  /* ── Select / deselect all visible rows ── */
+  const handleToggleAll = (visibleChannels) => {
+    const allVisible = visibleChannels.map((ch) => ch._id);
+    const allSelected = allVisible.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        allVisible.forEach((id) => next.delete(id));
+      } else {
+        allVisible.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  /* ── Bulk delete (archive) ── */
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = [...selectedIds];
+      const res = await api.delete('/channels/bulk', { data: { ids } });
+      toast.success(`${res.data.archived} channel${res.data.archived !== 1 ? 's' : ''} archived`);
+      setShowBulkConfirm(false);
+      clearSelection();
+      fetchChannels(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk delete failed');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  /* ── Sync All ── */
   const handleSyncAll = async () => {
     setSyncing(true);
     try {
@@ -69,6 +115,7 @@ export default function ChannelsPage() {
     }
   };
 
+  /* ── CSV Export ── */
   const handleExport = async () => {
     try {
       const res = await api.get('/export/channels', { responseType: 'blob' });
@@ -93,7 +140,7 @@ export default function ChannelsPage() {
     if (!deletingChannel) return;
     try {
       await api.delete(`/channels/${deletingChannel._id}`);
-      toast.success('Channel deleted');
+      toast.success('Channel archived');
       setDeletingChannel(null);
       fetchChannels(pagination.page);
     } catch (err) {
@@ -101,20 +148,19 @@ export default function ChannelsPage() {
     }
   };
 
+  const canDelete = canPerformAction('channels.delete');
+  const hasSelection = selectedIds.size > 0;
+
   return (
     <div>
       <TopBar title="Channels" onSearch={setSearch} />
       <div className="p-6 space-y-4">
-        {/* Action Bar */}
+
+        {/* ── Action Bar ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <FilterBar
-            filters={filters}
-            onFilterChange={setFilters}
-            showPeriod={false}
-          />
+          <FilterBar filters={filters} onFilterChange={setFilters} showPeriod={false} />
 
           <div className="flex items-center gap-2">
-            {/* Sort */}
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
@@ -132,19 +178,13 @@ export default function ChannelsPage() {
             <div className="flex bg-dark-800 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('table')}
-                className={clsx(
-                  'p-1.5 rounded',
-                  viewMode === 'table' ? 'bg-dark-600 text-dark-100' : 'text-dark-400'
-                )}
+                className={clsx('p-1.5 rounded', viewMode === 'table' ? 'bg-dark-600 text-dark-100' : 'text-dark-400')}
               >
                 <List className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={clsx(
-                  'p-1.5 rounded',
-                  viewMode === 'grid' ? 'bg-dark-600 text-dark-100' : 'text-dark-400'
-                )}
+                className={clsx('p-1.5 rounded', viewMode === 'grid' ? 'bg-dark-600 text-dark-100' : 'text-dark-400')}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
@@ -174,17 +214,42 @@ export default function ChannelsPage() {
             )}
 
             {canPerformAction('channels.add') && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="btn-primary text-sm flex items-center gap-1.5"
-              >
+              <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm flex items-center gap-1.5">
                 <Plus className="w-4 h-4" /> Add Channel
               </button>
             )}
           </div>
         </div>
 
-        {/* Channel List */}
+        {/* ── Bulk-selection action bar (appears when ≥1 row is selected) ── */}
+        {hasSelection && viewMode === 'table' && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-accent-500/10 border border-accent-500/30 animate-in fade-in duration-150">
+            <span className="text-sm font-medium text-accent-300">
+              {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''} selected
+            </span>
+
+            <button
+              onClick={clearSelection}
+              className="btn-ghost text-xs text-dark-400 flex items-center gap-1 py-1 px-2"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+
+            <div className="flex-1" />
+
+            {canDelete && (
+              <button
+                onClick={() => setShowBulkConfirm(true)}
+                className="btn-danger text-sm flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                Archive {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── Channel List ── */}
         {loading ? (
           <LoadingSpinner />
         ) : viewMode === 'table' ? (
@@ -193,6 +258,9 @@ export default function ChannelsPage() {
               channels={channels}
               onEdit={canPerformAction('channels.edit') ? (ch) => setEditingChannel(ch) : null}
               onDelete={canPerformAction('channels.delete') ? (ch) => setDeletingChannel(ch) : null}
+              selectedIds={selectedIds}
+              onToggleSelect={canDelete ? handleToggleSelect : null}
+              onToggleAll={canDelete ? handleToggleAll : null}
             />
           </div>
         ) : (
@@ -203,7 +271,7 @@ export default function ChannelsPage() {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         <Pagination
           page={pagination.page}
           pages={pagination.pages}
@@ -211,14 +279,14 @@ export default function ChannelsPage() {
           onPageChange={(p) => fetchChannels(p)}
         />
 
-        {/* Add Channel Modal */}
+        {/* ── Add Channel Modal ── */}
         <AddChannelModal
           open={showAddModal}
           onClose={() => setShowAddModal(false)}
           onAdded={() => fetchChannels(1)}
         />
 
-        {/* Edit Channel Modal (reuse add modal styling for consistency) */}
+        {/* ── Edit Channel Modal ── */}
         {editingChannel && (
           <EditChannelModal
             channel={editingChannel}
@@ -228,30 +296,60 @@ export default function ChannelsPage() {
           />
         )}
 
-        {/* Delete confirmation */}
+        {/* ── Single delete confirmation ── */}
         {deletingChannel && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="glass-card w-full max-w-sm p-6">
-              <h2 className="text-lg font-semibold mb-2">Delete channel</h2>
+              <h2 className="text-lg font-semibold mb-2">Archive channel</h2>
               <p className="text-sm text-dark-300 mb-4">
-                Are you sure you want to delete{' '}
-                <span className="font-semibold">{deletingChannel.title}</span>? You can restore
-                it later from archived channels.
+                Archive <span className="font-semibold">{deletingChannel.title}</span>? It will be
+                hidden from the dashboard but can be restored by changing its status.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button className="btn-secondary" onClick={() => setDeletingChannel(null)}>Cancel</button>
+                <button className="btn-danger" onClick={handleConfirmDelete}>Archive</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bulk delete confirmation ── */}
+        {showBulkConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-sm p-6">
+              <h2 className="text-lg font-semibold mb-2">Archive {selectedIds.size} channels</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Are you sure you want to archive{' '}
+                <span className="font-semibold">{selectedIds.size} selected channel{selectedIds.size !== 1 ? 's' : ''}</span>?
+                They will be hidden from the dashboard but can be restored by changing their status.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
-                  type="button"
                   className="btn-secondary"
-                  onClick={() => setDeletingChannel(null)}
+                  onClick={() => setShowBulkConfirm(false)}
+                  disabled={bulkDeleting}
                 >
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={handleConfirmDelete}
+                  className="btn-danger flex items-center gap-2 disabled:opacity-50"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
                 >
-                  Delete
+                  {bulkDeleting ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Archiving…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Archive {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
