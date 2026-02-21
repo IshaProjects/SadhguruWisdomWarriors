@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, Download, RefreshCw, Tv2, Video,
+  ChevronsUpDown, RefreshCw, Tv2, Video,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import { useCategories } from '../hooks/useCategories.js';
@@ -10,6 +10,18 @@ import toast from 'react-hot-toast';
 
 /* ── helpers ── */
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
+
+function OutlierBadge({ score }) {
+  if (score == null) return <span className="text-dark-500">—</span>;
+  const label = `${score.toFixed(2)}×`;
+  const cls =
+    score >= 3    ? 'bg-green-500/20 text-green-300' :
+    score >= 1.5  ? 'bg-emerald-500/15 text-emerald-400' :
+    score >= 0.75 ? 'bg-dark-700 text-dark-300' :
+    score >= 0.5  ? 'bg-yellow-500/15 text-yellow-400' :
+                    'bg-red-500/15 text-red-400';
+  return <span className={`badge text-xs font-mono ${cls}`}>{label}</span>;
+}
 
 function SortIcon({ col, sort }) {
   const [field, dir] = sort.startsWith('-') ? [sort.slice(1), 'desc'] : [sort, 'asc'];
@@ -599,15 +611,16 @@ function VideoReport() {
                 <Th label="Likes"           col="likes"          sort={sort} onSort={handleSort} />
                 <Th label="Comments"        col="comments"       sort={sort} onSort={handleSort} />
                 <Th label="Engagement %"    col="engagement_rate" sort={sort} onSort={handleSort} />
+                <Th label="Outlier Score"   col="outlier_score"  sort={sort} onSort={handleSort} />
                 <Th label="Duration"        col="duration"       sort={sort} onSort={handleSort} />
                 <Th label="Last Synced"     col="last_synced"    sort={sort} onSort={handleSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={11} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={12} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-12 text-dark-400">No videos match the current filters.</td></tr>
+                <tr><td colSpan={12} className="text-center py-12 text-dark-400">No videos match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_video_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -622,6 +635,9 @@ function VideoReport() {
                     <span className={`${r.engagement_rate >= 5 ? 'text-green-400' : r.engagement_rate >= 2 ? 'text-yellow-400' : 'text-dark-300'}`}>
                       {r.engagement_rate}%
                     </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <OutlierBadge score={r.outlier_score} />
                   </td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs">{r.duration || '—'}</td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs">{r.last_synced || '—'}</td>
