@@ -2,21 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import api from '../../services/api.js';
 import toast from 'react-hot-toast';
-
-const categories = [
-  'Uncategorized',
-  'Gaming',
-  'Education',
-  'Tech',
-  'Entertainment',
-  'Music',
-  'Sports',
-  'News',
-  'Lifestyle',
-  'Comedy',
-  'Science',
-  'Finance',
-];
+import { useCategories } from '../../hooks/useCategories.js';
 
 export default function EditChannelModal({ channel, open, onClose, onSaved }) {
   const [category, setCategory] = useState('Uncategorized');
@@ -25,6 +11,8 @@ export default function EditChannelModal({ channel, open, onClose, onSaved }) {
   const [status, setStatus] = useState('active');
   const [loading, setLoading] = useState(false);
 
+  const { categories, loading: catsLoading, refetch } = useCategories();
+
   useEffect(() => {
     if (!channel) return;
     setCategory(channel.category || 'Uncategorized');
@@ -32,6 +20,11 @@ export default function EditChannelModal({ channel, open, onClose, onSaved }) {
     setNotes(channel.notes || '');
     setStatus(channel.status || 'active');
   }, [channel]);
+
+  // Re-fetch the categories list every time the modal opens
+  useEffect(() => {
+    if (open) refetch();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open || !channel) return null;
 
@@ -74,12 +67,21 @@ export default function EditChannelModal({ channel, open, onClose, onSaved }) {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="input-field w-full"
+              disabled={catsLoading}
             >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              {catsLoading ? (
+                <option>Loading…</option>
+              ) : (
+                <>
+                  {/* If the channel's current category isn't in the list, show it anyway */}
+                  {category && !categories.includes(category) && (
+                    <option key={category} value={category}>{category}</option>
+                  )}
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 

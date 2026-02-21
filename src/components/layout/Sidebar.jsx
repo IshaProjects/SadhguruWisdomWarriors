@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   Youtube,
   ShieldCheck,
+  BarChart2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRbac } from '../../context/RbacContext.jsx';
@@ -15,10 +16,11 @@ import { useState } from 'react';
 import clsx from 'clsx';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', rbacKey: 'dashboard' },
-  { to: '/channels', icon: Tv2, label: 'Channels', rbacKey: 'channels' },
-  { to: '/sync', icon: RefreshCw, label: 'Sync Status', rbacKey: 'sync' },
-  { to: '/settings', icon: Settings, label: 'Settings', rbacKey: 'settings' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard',  rbacKey: 'dashboard' },
+  { to: '/channels',  icon: Tv2,             label: 'Channels',   rbacKey: 'channels'  },
+  { to: '/reports',   icon: BarChart2,        label: 'Reports',    rbacKey: 'reports'   },
+  { to: '/sync',      icon: RefreshCw,        label: 'Sync Status',rbacKey: 'sync'      },
+  { to: '/settings',  icon: Settings,         label: 'Settings',   rbacKey: 'settings'  },
 ];
 
 export default function Sidebar() {

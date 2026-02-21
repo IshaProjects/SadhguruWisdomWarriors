@@ -1,12 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import api from '../../services/api.js';
 import toast from 'react-hot-toast';
-
-const categories = [
-  'Uncategorized', 'Gaming', 'Education', 'Tech', 'Entertainment',
-  'Music', 'Sports', 'News', 'Lifestyle', 'Comedy', 'Science', 'Finance',
-];
+import { useCategories } from '../../hooks/useCategories.js';
 
 export default function AddChannelModal({ open, onClose, onAdded }) {
   const [channelInput, setChannelInput] = useState('');
@@ -14,6 +10,13 @@ export default function AddChannelModal({ open, onClose, onAdded }) {
   const [tags, setTags] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { categories, loading: catsLoading, refetch } = useCategories();
+
+  // Re-fetch the categories list every time the modal opens
+  useEffect(() => {
+    if (open) refetch();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
@@ -74,10 +77,15 @@ export default function AddChannelModal({ open, onClose, onAdded }) {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="input-field w-full"
+              disabled={catsLoading}
             >
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {catsLoading ? (
+                <option>Loading…</option>
+              ) : (
+                categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))
+              )}
             </select>
           </div>
 

@@ -11,6 +11,7 @@ import ImportPage from './pages/ImportPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import RbacConfigPage from './pages/RbacConfigPage.jsx';
+import ReportsPage from './pages/ReportsPage.jsx';
 import LoadingSpinner from './components/common/LoadingSpinner.jsx';
 
 function ProtectedRoute({ children }) {
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/channels/import" element={<RbacRoute pageKey="import"><ImportPage /></RbacRoute>} />
         <Route path="/channels/:id" element={<RbacRoute pageKey="channels"><ChannelDetailPage /></RbacRoute>} />
         <Route path="/sync" element={<RbacRoute pageKey="sync"><SyncPage /></RbacRoute>} />
+        <Route path="/reports" element={<RbacRoute pageKey="reports"><ReportsPage /></RbacRoute>} />
         <Route path="/settings" element={<RbacRoute pageKey="settings"><SettingsPage /></RbacRoute>} />
         <Route path="/settings/rbac" element={<RbacConfigPage />} />
       </Route>

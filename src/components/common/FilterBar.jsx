@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Filter, X, Calendar } from 'lucide-react';
 import clsx from 'clsx';
+import { useCategories } from '../../hooks/useCategories.js';
 
 const periods = [
   { value: '7d', label: '7D' },
@@ -8,23 +9,12 @@ const periods = [
   { value: '90d', label: '90D' },
 ];
 
-const categories = [
-  'All',
-  'Gaming',
-  'Education',
-  'Tech',
-  'Entertainment',
-  'Music',
-  'Sports',
-  'News',
-  'Lifestyle',
-  'Uncategorized',
-];
-
 const statuses = ['All', 'active', 'paused', 'archived'];
 
 export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false }) {
   const [showFilters, setShowFilters] = useState(false);
+  const { categories: dbCategories, loading: catsLoading } = useCategories();
+  const categories = ['All', ...dbCategories];
 
   const updateFilter = (key, value) => {
     const next = { ...filters, [key]: value === 'All' ? '' : value };
@@ -135,11 +125,10 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
               value={filters.category || 'All'}
               onChange={(e) => updateFilter('category', e.target.value)}
               className="input-field text-sm py-1.5"
+              disabled={catsLoading}
             >
               {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
