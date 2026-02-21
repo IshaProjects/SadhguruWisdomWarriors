@@ -8,7 +8,7 @@ import GrowthChart from '../components/dashboard/GrowthChart.jsx';
 import TopChannelsChart from '../components/dashboard/TopChannelsChart.jsx';
 import ViewsPerChannelChart from '../components/dashboard/ViewsPerChannelChart.jsx';
 import PublishingChart from '../components/dashboard/PublishingChart.jsx';
-import ViewsTrendChart from '../components/dashboard/ViewsTrendChart.jsx';
+import ViewsByCategoryChart from '../components/dashboard/ViewsByCategoryChart.jsx';
 import TopVideosTable from '../components/dashboard/TopVideosTable.jsx';
 import ChannelMetricsTable from '../components/dashboard/ChannelMetricsTable.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
@@ -181,13 +181,12 @@ export default function DashboardPage() {
             </DashboardWidget>
           </GridItem>
 
-          {/* ②  Views Trend — "what's happening to views right now" */}
+          {/* ②  Views per Subscriber by Category */}
           <GridItem key="viewstrend">
-            <DashboardWidget id="viewstrend" title="Views Trend" className="h-full">
-              <ViewsTrendChart
-                data={growthData}
-                dataKey="viewsDelta"
-                tooltip="Day-over-day change in total views across all channels. Bars above zero indicate more views than the previous day; bars below zero indicate a drop. Useful for spotting viral moments or traffic dips."
+            <DashboardWidget id="viewstrend" title="Views per Subscriber by Category" className="h-full">
+              <ViewsByCategoryChart
+                data={categories}
+                tooltip="Views per Subscriber = total views ÷ total subscribers for each category. A higher ratio means the category's audience is highly engaged relative to its size — they watch more content per subscriber. The dashed line shows the overall average across all categories. Bars above the line are outperforming; bars below are underperforming."
                 fullHeight
               />
             </DashboardWidget>
