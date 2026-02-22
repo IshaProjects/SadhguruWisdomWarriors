@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, RefreshCw, Tv2, Video,
+  ChevronsUpDown, RefreshCw, Tv2, Video, Tag,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import { useCategories } from '../hooks/useCategories.js';
@@ -61,7 +61,7 @@ function Pagination({ page, pages, total, limit, onPage }) {
    Main Page
 ═══════════════════════════════════════════════════════════════════ */
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('channels');
+  const [activeTab, setActiveTab] = useState('categories');
 
   return (
     <div className="flex flex-col h-full">
@@ -70,8 +70,9 @@ export default function ReportsPage() {
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-dark-700">
           {[
-            { id: 'channels', label: 'Channel Report', Icon: Tv2   },
-            { id: 'videos',   label: 'Video Report',   Icon: Video  },
+            { id: 'channels',   label: 'Channel Report',  Icon: Tv2   },
+            { id: 'videos',     label: 'Video Report',    Icon: Video  },
+            { id: 'categories', label: 'Category Report', Icon: Tag    },
           ].map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -88,8 +89,9 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {activeTab === 'channels' && <ChannelReport />}
-        {activeTab === 'videos'   && <VideoReport   />}
+        {activeTab === 'channels'   && <ChannelReport   />}
+        {activeTab === 'videos'     && <VideoReport     />}
+        {activeTab === 'categories' && <CategoryReport  />}
       </div>
     </div>
   );
@@ -339,6 +341,433 @@ function ChannelReport() {
         </div>
         <Pagination page={page} pages={pagination.pages} total={pagination.total} limit={LIMIT} onPage={setPage} />
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Category Views Report Tab
+═══════════════════════════════════════════════════════════════════ */
+function CategoryReport() {
+  // ── server-filter state (passed to the API) ───────────────────────────────
+  const [statusFilter, setStatusFilter] = useState('');   // active | paused | archived | ''
+  const [tagsFilter,   setTagsFilter]   = useState('');
+
+  // channel autocomplete (maps to the `category` filter on the server — we
+  // actually want to filter channels by a selected category name, which the
+  // /dashboard/categories endpoint already supports via ?category=)
+  // The user asked for a "channel" filter, interpreted as: pick a specific
+  // channel → show only the category that channel belongs to.
+  const [channelSearch,   setChannelSearch]   = useState('');
+  const [channelOptions,  setChannelOptions]  = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState(null); // { _id, title, category }
+  const channelDebRef = useRef(null);
+
+  // ── display state ─────────────────────────────────────────────────────────
+  const [rows,        setRows]        = useState([]);
+  const [loading,     setLoading]     = useState(false);
+  const [sort,        setSort]        = useState('viewsPerSub');
+  const [sortDir,     setSortDir]     = useState('desc');
+  const [search,      setSearch]      = useState('');      // client-side category name filter
+  const [groupFilter, setGroupFilter] = useState('');      // '' | 'dedicated' | 'ihi'
+  const [showFilters, setShowFilters] = useState(false);
+  const [exporting,   setExporting]   = useState('');
+
+  // ── fetch from server ─────────────────────────────────────────────────────
+  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter) => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (sf)  params.status = sf;
+      if (tf)  params.tags   = tf;
+      const res = await api.get('/dashboard/categories', { params });
+      setRows(res.data);
+    } catch {
+      toast.error('Failed to load category report');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, tagsFilter]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── channel autocomplete ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!channelSearch.trim()) { setChannelOptions([]); return; }
+    clearTimeout(channelDebRef.current);
+    channelDebRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get('/channels', { params: { search: channelSearch, limit: 10 } });
+        setChannelOptions(res.data.channels || []);
+      } catch { /* ignore */ }
+    }, 300);
+  }, [channelSearch]);
+
+  const selectChannel = (ch) => {
+    setSelectedChannel(ch);
+    setChannelSearch(ch.title);
+    setChannelOptions([]);
+    // narrow the category name filter to just that channel's category
+    setSearch(ch.category || '');
+  };
+
+  const clearChannel = () => {
+    setSelectedChannel(null);
+    setChannelSearch('');
+    setSearch('');
+    setChannelOptions([]);
+  };
+
+  const clearAllFilters = () => {
+    setStatusFilter('');
+    setTagsFilter('');
+    setGroupFilter('');
+    clearChannel();
+  };
+
+  const hasFilters = statusFilter || tagsFilter || selectedChannel || groupFilter;
+
+  // ── sort ──────────────────────────────────────────────────────────────────
+  const handleSort = (col) => {
+    if (sort === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSort(col); setSortDir('desc'); }
+  };
+
+  // ── computed rows (client-side sort + category name search) ───────────────
+  const displayed = [...rows]
+    .filter((r) => !search.trim() || r.category.toLowerCase().includes(search.toLowerCase()))
+    .filter((r) => {
+      if (groupFilter === 'dedicated') return r.category.toLowerCase().startsWith('dedicated');
+      if (groupFilter === 'ihi')       return r.category.toLowerCase().includes('ihi');
+      return true;
+    })
+    .map((r) => ({
+      ...r,
+      avgViews:    r.count      ? Math.round(r.totalViews / r.count) : 0,
+      viewsPerSub: r.totalSubs  ? r.totalViews / r.totalSubs          : 0,
+    }))
+    .sort((a, b) => {
+      const av = a[sort] ?? 0;
+      const bv = b[sort] ?? 0;
+      const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+  // ── aggregates ────────────────────────────────────────────────────────────
+  const totals = displayed.reduce(
+    (acc, r) => ({ channels: acc.channels + r.count, subs: acc.subs + r.totalSubs, views: acc.views + r.totalViews }),
+    { channels: 0, subs: 0, views: 0 }
+  );
+  const overallViewsPerSub = totals.subs ? totals.views / totals.subs : 0;
+  const maxViews    = Math.max(...displayed.map((r) => r.totalViews), 1);
+  const maxVpS      = Math.max(...displayed.map((r) => r.viewsPerSub), 0.001);
+
+  // ── export ────────────────────────────────────────────────────────────────
+  const buildCsvContent = () => {
+    const totalViews = totals.views || 1;
+    const header = 'Category,Channels,Total Subscribers,Total Views,Avg Views/Channel,Views per Subscriber,% of Total Views\n';
+    const body = displayed.map((r) => {
+      const pct = ((r.totalViews / totalViews) * 100).toFixed(1);
+      return `"${r.category}",${r.count},${r.totalSubs},${r.totalViews},${r.avgViews},${r.viewsPerSub.toFixed(3)},${pct}%`;
+    }).join('\n');
+    return header + body;
+  };
+
+  const downloadCsv = (filename) => {
+    const blob = new Blob([buildCsvContent()], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = () => {
+    setExporting('csv');
+    try { downloadCsv(`category-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported as CSV'); }
+    catch { toast.error('Export failed'); }
+    finally { setExporting(''); }
+  };
+
+  const handleExportExcel = () => {
+    setExporting('excel');
+    try { downloadCsv(`category-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported (CSV format)'); }
+    catch { toast.error('Export failed'); }
+    finally { setExporting(''); }
+  };
+
+  // ── scoped sort-icon + header helpers ────────────────────────────────────
+  function CatSortIcon({ col }) {
+    if (sort !== col) return <ChevronsUpDown className="w-3 h-3 opacity-30" />;
+    return sortDir === 'asc'
+      ? <ChevronUp   className="w-3 h-3 text-accent-400" />
+      : <ChevronDown className="w-3 h-3 text-accent-400" />;
+  }
+
+  function CTh({ label, col, title }) {
+    return (
+      <th
+        title={title}
+        className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-dark-200 transition-colors"
+        onClick={() => handleSort(col)}
+      >
+        <span className="flex items-center gap-1">{label}<CatSortIcon col={col} /></span>
+      </th>
+    );
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3 justify-between">
+        {/* Category name search */}
+        <div className="relative flex-1 min-w-48 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+          <input
+            type="text"
+            placeholder="Filter categories…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); if (selectedChannel) clearChannel(); }}
+            className="input-field pl-9 w-full text-sm"
+          />
+          {search && !selectedChannel && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`btn-ghost flex items-center gap-2 text-sm ${showFilters ? 'text-accent-400' : ''}`}
+          >
+            <Filter className="w-4 h-4" /> Filters
+            {hasFilters && <span className="w-2 h-2 rounded-full bg-accent-500 ml-0.5" />}
+          </button>
+          {hasFilters && (
+            <button onClick={clearAllFilters} className="btn-ghost text-xs text-dark-400 flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+          <button onClick={() => fetchData()} className="btn-ghost p-2" title="Refresh">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button onClick={handleExportCsv} disabled={!!exporting}
+            className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileText className="w-4 h-4" />
+            {exporting === 'csv' ? 'Exporting…' : 'CSV'}
+          </button>
+          <button onClick={handleExportExcel} disabled={!!exporting}
+            className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileSpreadsheet className="w-4 h-4" />
+            {exporting === 'excel' ? 'Exporting…' : 'Excel'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Filter Panel ─────────────────────────────────────────────────── */}
+      {showFilters && (
+        <div className="glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+          {/* Channel autocomplete — narrows to that channel's category */}
+          <div className="sm:col-span-1">
+            <label className="block text-xs text-dark-400 mb-1">
+              Filter by Channel
+              <span className="ml-1 text-dark-500">(shows the channel's category)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search channel name…"
+                value={channelSearch}
+                onChange={(e) => { setChannelSearch(e.target.value); if (!e.target.value) clearChannel(); }}
+                className="input-field text-sm w-full pr-7"
+              />
+              {selectedChannel && (
+                <button onClick={clearChannel} className="absolute right-2 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {channelOptions.length > 0 && (
+                <div className="absolute z-20 top-full mt-1 w-full bg-dark-800 border border-dark-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  {channelOptions.map((ch) => (
+                    <button key={ch._id} type="button" onClick={() => selectChannel(ch)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-dark-700 transition-colors">
+                      <span className="font-medium">{ch.title}</span>
+                      {ch.category && <span className="ml-2 text-xs text-dark-500">{ch.category}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Channel status filter — affects which channels are aggregated */}
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Channel Status</label>
+            <select value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter); }}
+              className="input-field text-sm w-full">
+              <option value="">All (excl. archived)</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          {/* Tags filter */}
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Tags</label>
+            <input type="text" placeholder="comma-separated" value={tagsFilter}
+              onChange={(e) => setTagsFilter(e.target.value)}
+              onBlur={() => fetchData(statusFilter, tagsFilter)}
+              className="input-field text-sm w-full" />
+          </div>
+
+          {/* Group quick-filter */}
+          <div className="sm:col-span-3">
+            <label className="block text-xs text-dark-400 mb-2">Category Group</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: '',          label: 'All Categories' },
+                { value: 'dedicated', label: 'Dedicated (starts with "Dedicated")' },
+                { value: 'ihi',       label: 'IHI (contains "IHI")' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGroupFilter(value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    groupFilter === value
+                      ? 'bg-accent-500/20 border-accent-500/40 text-accent-300'
+                      : 'bg-dark-800 border-dark-600 text-dark-400 hover:text-dark-200 hover:border-dark-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Summary cards ────────────────────────────────────────────────── */}
+      {!loading && displayed.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[
+            { label: 'Categories',           value: displayed.length.toLocaleString() },
+            { label: 'Total Channels',        value: fmt(totals.channels) },
+            { label: 'Total Subscribers',     value: fmt(totals.subs) },
+            { label: 'Total Views',           value: fmt(totals.views) },
+            { label: 'Overall Views / Sub',   value: overallViewsPerSub.toFixed(2) },
+          ].map(({ label, value }) => (
+            <div key={label} className="glass-card px-4 py-3">
+              <p className="text-xs text-dark-400 mb-1">{label}</p>
+              <p className="text-lg font-semibold font-mono">{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Table ────────────────────────────────────────────────────────── */}
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-dark-800/60">
+              <tr>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide w-8">#</th>
+                <CTh label="Category"            col="category"    />
+                <CTh label="Channels"            col="count"       />
+                <CTh label="Total Subscribers"   col="totalSubs"   />
+                <CTh label="Total Views"         col="totalViews"  />
+                <CTh label="Avg Views / Channel" col="avgViews"    />
+                <CTh
+                  label="Views / Subscriber"
+                  col="viewsPerSub"
+                  title="Avg category views ÷ total subscribers — higher = more efficient audience reach"
+                />
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide min-w-[160px]">
+                  Share of Views
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-700/50">
+              {loading ? (
+                <tr><td colSpan={8} className="text-center py-12 text-dark-400">Loading…</td></tr>
+              ) : displayed.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-12 text-dark-400">No categories found.</td></tr>
+              ) : displayed.map((r, i) => {
+                const sharePct  = totals.views ? (r.totalViews / totals.views) * 100 : 0;
+                const barW      = (r.totalViews / maxViews) * 100;
+                const vpsBadge  =
+                  r.viewsPerSub >= overallViewsPerSub * 1.5  ? 'text-green-400' :
+                  r.viewsPerSub >= overallViewsPerSub         ? 'text-emerald-400' :
+                  r.viewsPerSub >= overallViewsPerSub * 0.5  ? 'text-dark-300' :
+                                                                'text-yellow-400';
+                return (
+                  <tr key={r.category} className="hover:bg-dark-800/40 transition-colors">
+                    <td className="px-3 py-2.5 text-dark-500 text-xs">{i + 1}</td>
+                    <td className="px-3 py-2.5 font-medium">{r.category}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{fmt(r.count)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{fmt(r.totalSubs)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.totalViews)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.avgViews)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">
+                      <span className={`font-semibold ${vpsBadge}`}>
+                        {r.viewsPerSub >= 1000
+                          ? `${(r.viewsPerSub / 1000).toFixed(1)}k`
+                          : r.viewsPerSub.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-dark-700 rounded-full h-2 overflow-hidden">
+                          <div className="h-2 rounded-full bg-accent-500 transition-all duration-500"
+                            style={{ width: `${barW}%` }} />
+                        </div>
+                        <span className="text-xs text-dark-400 w-10 text-right shrink-0">
+                          {sharePct.toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {!loading && displayed.length > 0 && (
+              <tfoot className="border-t-2 border-dark-600 bg-dark-800/40">
+                <tr>
+                  <td className="px-3 py-2.5" />
+                  <td className="px-3 py-2.5 text-xs font-semibold text-dark-300">TOTAL</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.channels)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.subs)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-accent-300">{fmt(totals.views)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">
+                    {fmt(totals.channels ? Math.round(totals.views / totals.channels) : 0)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">
+                    {overallViewsPerSub.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-dark-400 text-right">100%</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Legend for Views/Sub colour coding */}
+      {!loading && displayed.length > 0 && (
+        <p className="text-xs text-dark-500">
+          <span className="text-green-400 font-medium">Green</span> = 1.5× above average ·{' '}
+          <span className="text-emerald-400 font-medium">Teal</span> = above average ·{' '}
+          <span className="text-dark-300 font-medium">Grey</span> = average ·{' '}
+          <span className="text-yellow-400 font-medium">Yellow</span> = below average ·
+          {' '}Overall avg: <span className="font-mono">{overallViewsPerSub.toFixed(2)}</span>
+        </p>
+      )}
     </div>
   );
 }

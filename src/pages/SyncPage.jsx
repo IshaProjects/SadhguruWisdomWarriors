@@ -240,15 +240,22 @@ function describeCron(expr) {
 }
 
 function ScheduleField({ label, value, onChange }) {
-  const [customMode, setCustomMode] = useState(false);
+  // Start in customMode if the initial value isn't a known preset
+  const [customMode, setCustomMode] = useState(() => !!value && !CRON_LABELS[value]);
 
   const handleSelect = (selected) => {
     if (selected === '__custom__') {
       setCustomMode(true);
     } else {
       setCustomMode(false);
-      onChange(selected);
+      onChange(selected);   // propagate the chosen cron string up
     }
+  };
+
+  // Typing directly in the input → switch to custom mode automatically
+  const handleTextChange = (e) => {
+    setCustomMode(true);
+    onChange(e.target.value);
   };
 
   return (
@@ -258,17 +265,17 @@ function ScheduleField({ label, value, onChange }) {
         <input
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setCustomMode(true)}
+          onChange={handleTextChange}
           placeholder="e.g. 0 3 * * *"
           className="input-field text-sm flex-1 font-mono"
         />
+        {/* Controlled — shows the matching preset when value is a known expression */}
         <select
-          value=""
+          value={customMode ? '__custom__' : (CRON_LABELS[value] ? value : '')}
           onChange={(e) => { if (e.target.value) handleSelect(e.target.value); }}
-          className="input-field text-xs w-40"
+          className="input-field text-xs w-44"
         >
-          <option value="" disabled>Presets</option>
+          <option value="" disabled>— Presets —</option>
           {PRESET_GROUPS.map((g) => (
             <optgroup key={g.group} label={g.group}>
               {g.options.map((o) => (
@@ -278,10 +285,11 @@ function ScheduleField({ label, value, onChange }) {
           ))}
         </select>
       </div>
+      {/* Human-readable description of the current value */}
       <p className="text-xs text-dark-500">
         {customMode
-          ? <span className="font-mono">{value || '—'}</span>
-          : describeCron(value)
+          ? <span className="font-mono text-dark-400">{value || '—'}</span>
+          : <span>{describeCron(value)}</span>
         }
       </p>
     </div>

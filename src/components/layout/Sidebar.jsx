@@ -9,6 +9,7 @@ import {
   Youtube,
   ShieldCheck,
   BarChart2,
+  Cpu,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRbac } from '../../context/RbacContext.jsx';
@@ -18,8 +19,9 @@ import clsx from 'clsx';
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard',  rbacKey: 'dashboard' },
   { to: '/channels',  icon: Tv2,             label: 'Channels',   rbacKey: 'channels'  },
-  { to: '/reports',   icon: BarChart2,        label: 'Reports',    rbacKey: 'reports'   },
-  { to: '/sync',      icon: RefreshCw,        label: 'Sync Status',rbacKey: 'sync'      },
+  { to: '/reports',    icon: BarChart2,  label: 'Reports',    rbacKey: 'reports'    },
+  { to: '/ai-studio', icon: Cpu,        label: 'AI Studio',  rbacKey: 'ai-studio'  },
+  { to: '/sync',       icon: RefreshCw,  label: 'Sync Status',rbacKey: 'sync'       },
   { to: '/settings',  icon: Settings,         label: 'Settings',   rbacKey: 'settings'  },
 ];
 
