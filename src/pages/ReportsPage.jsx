@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, RefreshCw, Tv2, Video, Tag,
+  ChevronsUpDown, RefreshCw, Tv2, Video, Tag, CalendarRange,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import { useCategories } from '../hooks/useCategories.js';
@@ -10,6 +10,57 @@ import toast from 'react-hot-toast';
 
 /* ── helpers ── */
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
+
+/* ── Reusable date range picker ──────────────────────────────────────────────
+   Renders two date inputs (Start / End) and calls onChange whenever either
+   changes. Clears both with a single ✕ button when a range is active.
+   Props:
+     startDate / endDate  – controlled string values (YYYY-MM-DD)
+     onStartDate / onEndDate – individual change handlers
+     onClear – clears both dates
+*/
+function DateRangeFilter({ startDate, endDate, onStartDate, onEndDate, onClear }) {
+  const hasRange = startDate || endDate;
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="flex items-center gap-1.5 text-xs text-dark-400 shrink-0">
+        <CalendarRange className="w-3.5 h-3.5" />
+        <span className="font-medium">Date Range</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div>
+          <label className="block text-xs text-dark-500 mb-1">From</label>
+          <input
+            type="date"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => onStartDate(e.target.value)}
+            className="input-field text-xs w-36"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-dark-500 mb-1">To</label>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => onEndDate(e.target.value)}
+            className="input-field text-xs w-36"
+          />
+        </div>
+        {hasRange && (
+          <button
+            onClick={onClear}
+            className="mt-4 p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200 transition-colors"
+            title="Clear date range"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function OutlierBadge({ score }) {
   if (score == null) return <span className="text-dark-500">—</span>;
@@ -106,6 +157,7 @@ function ChannelReport() {
   const [filters, setFilters] = useState({
     search: '', category: '', status: '', tags: '',
     minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '',
+    startDate: '', endDate: '',
   });
   const [showFilters, setShowFilters] = useState(true);
   const [sort,  setSort]  = useState('-subscribers');
@@ -156,7 +208,7 @@ function ChannelReport() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', category: '', status: '', tags: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '' });
+    setFilters({ search: '', category: '', status: '', tags: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '', startDate: '', endDate: '' });
     setPage(1);
   };
 
@@ -286,6 +338,16 @@ function ChannelReport() {
             <label className="block text-xs text-dark-400 mb-1">Max Total Views</label>
             <input type="number" min="0" value={filters.maxViews} onChange={(e) => handleFilterChange('maxViews', e.target.value)} className="input-field text-sm w-full" placeholder="∞" />
           </div>
+          <div className="col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-5 pt-1 border-t border-dark-700/50">
+            <DateRangeFilter
+              startDate={filters.startDate}
+              endDate={filters.endDate}
+              onStartDate={(v) => handleFilterChange('startDate', v)}
+              onEndDate={(v) => handleFilterChange('endDate', v)}
+              onClear={() => { handleFilterChange('startDate', ''); handleFilterChange('endDate', ''); }}
+            />
+            <p className="text-xs text-dark-500 mt-1.5">Filters channels by their last sync date.</p>
+          </div>
         </div>
       )}
 
@@ -352,6 +414,8 @@ function CategoryReport() {
   // ── server-filter state (passed to the API) ───────────────────────────────
   const [statusFilter, setStatusFilter] = useState('');   // active | paused | archived | ''
   const [tagsFilter,   setTagsFilter]   = useState('');
+  const [startDate,    setStartDate]    = useState('');
+  const [endDate,      setEndDate]      = useState('');
 
   // channel autocomplete (maps to the `category` filter on the server — we
   // actually want to filter channels by a selected category name, which the
@@ -374,12 +438,14 @@ function CategoryReport() {
   const [exporting,   setExporting]   = useState('');
 
   // ── fetch from server ─────────────────────────────────────────────────────
-  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter) => {
+  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, sd = startDate, ed = endDate) => {
     setLoading(true);
     try {
       const params = {};
-      if (sf)  params.status = sf;
-      if (tf)  params.tags   = tf;
+      if (sf)  params.status    = sf;
+      if (tf)  params.tags      = tf;
+      if (sd)  params.startDate = sd;
+      if (ed)  params.endDate   = ed;
       const res = await api.get('/dashboard/categories', { params });
       setRows(res.data);
     } catch {
@@ -387,7 +453,7 @@ function CategoryReport() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, tagsFilter]);
+  }, [statusFilter, tagsFilter, startDate, endDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -421,11 +487,13 @@ function CategoryReport() {
   const clearAllFilters = () => {
     setStatusFilter('');
     setTagsFilter('');
+    setStartDate('');
+    setEndDate('');
     setGroupFilter('');
     clearChannel();
   };
 
-  const hasFilters = statusFilter || tagsFilter || selectedChannel || groupFilter;
+  const hasFilters = statusFilter || tagsFilter || selectedChannel || groupFilter || startDate || endDate;
 
   // ── sort ──────────────────────────────────────────────────────────────────
   const handleSort = (col) => {
@@ -608,7 +676,7 @@ function CategoryReport() {
           <div>
             <label className="block text-xs text-dark-400 mb-1">Channel Status</label>
             <select value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter); }}
+              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter, startDate, endDate); }}
               className="input-field text-sm w-full">
               <option value="">All (excl. archived)</option>
               <option value="active">Active</option>
@@ -622,7 +690,7 @@ function CategoryReport() {
             <label className="block text-xs text-dark-400 mb-1">Tags</label>
             <input type="text" placeholder="comma-separated" value={tagsFilter}
               onChange={(e) => setTagsFilter(e.target.value)}
-              onBlur={() => fetchData(statusFilter, tagsFilter)}
+              onBlur={() => fetchData(statusFilter, tagsFilter, startDate, endDate)}
               className="input-field text-sm w-full" />
           </div>
 
@@ -649,6 +717,18 @@ function CategoryReport() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Date range — filters by channel lastSyncedAt */}
+          <div className="sm:col-span-3 pt-1 border-t border-dark-700/50">
+            <DateRangeFilter
+              startDate={startDate}
+              endDate={endDate}
+              onStartDate={(v) => { setStartDate(v); fetchData(statusFilter, tagsFilter, v, endDate); }}
+              onEndDate={(v) => { setEndDate(v); fetchData(statusFilter, tagsFilter, startDate, v); }}
+              onClear={() => { setStartDate(''); setEndDate(''); fetchData(statusFilter, tagsFilter, '', ''); }}
+            />
+            <p className="text-xs text-dark-500 mt-1.5">Filters categories by channels' last sync date.</p>
           </div>
         </div>
       )}
@@ -1003,14 +1083,15 @@ function VideoReport() {
             <input type="text" placeholder="comma-separated" value={filters.tags} onChange={(e) => handleFilterChange('tags', e.target.value)} className="input-field text-sm w-full" />
           </div>
 
-          <div>
-            <label className="block text-xs text-dark-400 mb-1">Published From</label>
-            <input type="date" value={filters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} className="input-field text-sm w-full" max={filters.endDate || undefined} />
-          </div>
-
-          <div>
-            <label className="block text-xs text-dark-400 mb-1">Published To</label>
-            <input type="date" value={filters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} className="input-field text-sm w-full" min={filters.startDate || undefined} />
+          <div className="col-span-2">
+            <label className="block text-xs text-dark-400 mb-2">Published Date Range</label>
+            <DateRangeFilter
+              startDate={filters.startDate}
+              endDate={filters.endDate}
+              onStartDate={(v) => handleFilterChange('startDate', v)}
+              onEndDate={(v) => handleFilterChange('endDate', v)}
+              onClear={() => { handleFilterChange('startDate', ''); handleFilterChange('endDate', ''); }}
+            />
           </div>
 
           <div>
