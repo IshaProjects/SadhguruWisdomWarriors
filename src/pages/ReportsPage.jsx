@@ -11,6 +11,16 @@ import toast from 'react-hot-toast';
 /* ── helpers ── */
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
 
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate:   end.toISOString().slice(0, 10),
+  };
+}
+
 /* ── Reusable date range picker ──────────────────────────────────────────────
    Renders two date inputs (Start / End) and calls onChange whenever either
    changes. Clears both with a single ✕ button when a range is active.
@@ -153,19 +163,22 @@ export default function ReportsPage() {
 ═══════════════════════════════════════════════════════════════════ */
 function ChannelReport() {
   const { categories } = useCategories();
+  const monthRange = getCurrentMonthRange();
 
   const [filters, setFilters] = useState({
     search: '', category: '', status: '', tags: '',
     minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '',
-    startDate: '', endDate: '',
+    startDate: monthRange.startDate,
+    endDate:   monthRange.endDate,
   });
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [sort,  setSort]  = useState('-subscribers');
   const [page,  setPage]  = useState(1);
   const LIMIT = 50;
 
   const [rows,       setRows]       = useState([]);
   const [pagination, setPagination] = useState({ total: 0, pages: 0 });
+  const [summary,    setSummary]    = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [exporting,  setExporting]  = useState('');
 
@@ -175,13 +188,15 @@ function ChannelReport() {
     setLoading(true);
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
-      // map sort key back to mongo field name
-      params.sort = s.replace('subscribers', 'currentStats.subscribers')
-                     .replace('total_views', 'currentStats.views')
-                     .replace('video_count', 'currentStats.videoCount');
+      // map sort key back to mongo/row field name (period fields pass through as-is)
+      const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(s.replace(/^[-+]/, ''));
+      params.sort = isPeriodSort ? s : s.replace('subscribers', 'currentStats.subscribers')
+                                         .replace('total_views', 'currentStats.views')
+                                         .replace('video_count', 'currentStats.videoCount');
       const res = await api.get('/export/report/channels', { params });
       setRows(res.data.data);
       setPagination(res.data.pagination);
+      setSummary(res.data.summary ?? null);
     } catch {
       toast.error('Failed to load channel report');
     } finally {
@@ -193,6 +208,17 @@ function ChannelReport() {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchData(filters, sort, page), 300);
   }, [filters, sort, page, fetchData]);
+
+  // Default sort to Views (Period) when date range selected; reset when leaving period mode
+  useEffect(() => {
+    const curKey = sort.replace(/^[-+]/, '');
+    const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(curKey);
+    if (filters.startDate && filters.endDate) {
+      if (!isPeriodSort) setSort('-views_in_period');
+    } else if (isPeriodSort) {
+      setSort('-subscribers');
+    }
+  }, [filters.startDate, filters.endDate]);
 
   const handleSort = (col) => {
     setSort((prev) => {
@@ -208,7 +234,8 @@ function ChannelReport() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', category: '', status: '', tags: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '', startDate: '', endDate: '' });
+    const { startDate, endDate } = getCurrentMonthRange();
+    setFilters({ search: '', category: '', status: '', tags: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '', startDate, endDate });
     setPage(1);
   };
 
@@ -216,9 +243,10 @@ function ChannelReport() {
     setExporting(format);
     try {
       const params = { ...filters, sort, format };
-      params.sort = sort.replace('subscribers', 'currentStats.subscribers')
-                        .replace('total_views', 'currentStats.views')
-                        .replace('video_count', 'currentStats.videoCount');
+      const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(sort.replace(/^[-+]/, ''));
+      params.sort = isPeriodSort ? sort : sort.replace('subscribers', 'currentStats.subscribers')
+                                               .replace('total_views', 'currentStats.views')
+                                               .replace('video_count', 'currentStats.videoCount');
       const res = await api.get('/export/report/channels', {
         params,
         responseType: 'blob',
@@ -242,21 +270,56 @@ function ChannelReport() {
   };
 
   const hasFilters = Object.values(filters).some((v) => v !== '');
+  const isPeriodMode = !!(filters.startDate && filters.endDate);
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
-        {/* Search */}
-        <div className="relative flex-1 min-w-52 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-          <input
-            type="text"
-            placeholder="Search channels…"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="input-field pl-9 w-full text-sm"
-          />
+        {/* Search + Date range */}
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+          <div className="relative min-w-52 max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+            <input
+              type="text"
+              placeholder="Search channels…"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              className="input-field pl-9 w-full text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={filters.startDate}
+              max={filters.endDate || undefined}
+              onChange={(e) => handleFilterChange('startDate', e.target.value)}
+              className="input-field text-sm w-36"
+              title="From"
+            />
+            <span className="text-dark-500 text-sm">→</span>
+            <input
+              type="date"
+              value={filters.endDate}
+              min={filters.startDate || undefined}
+              onChange={(e) => handleFilterChange('endDate', e.target.value)}
+              className="input-field text-sm w-36"
+              title="To"
+            />
+            {(filters.startDate || filters.endDate) && (
+              <button
+                onClick={() => {
+                  const { startDate, endDate } = getCurrentMonthRange();
+                  setFilters((prev) => ({ ...prev, startDate, endDate }));
+                  setPage(1);
+                }}
+                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
+                title="Reset to current month"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -338,15 +401,29 @@ function ChannelReport() {
             <label className="block text-xs text-dark-400 mb-1">Max Total Views</label>
             <input type="number" min="0" value={filters.maxViews} onChange={(e) => handleFilterChange('maxViews', e.target.value)} className="input-field text-sm w-full" placeholder="∞" />
           </div>
-          <div className="col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-5 pt-1 border-t border-dark-700/50">
-            <DateRangeFilter
-              startDate={filters.startDate}
-              endDate={filters.endDate}
-              onStartDate={(v) => handleFilterChange('startDate', v)}
-              onEndDate={(v) => handleFilterChange('endDate', v)}
-              onClear={() => { handleFilterChange('startDate', ''); handleFilterChange('endDate', ''); }}
-            />
-            <p className="text-xs text-dark-500 mt-1.5">Filters channels by their last sync date.</p>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      {!loading && summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Views in this time range</p>
+            <p className="text-xl font-semibold text-accent-400">
+              {fmt(isPeriodMode ? summary.totalViewsInPeriod : summary.totalViews)}
+            </p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Channels</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalChannels)}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Subscribers</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalSubscribers)}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Videos</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalVideos)}</p>
           </div>
         </div>
       )}
@@ -363,7 +440,10 @@ function ChannelReport() {
                 <Th label="Status"             col="status"             sort={sort} onSort={handleSort} />
                 <Th label="Country"            col="country"            sort={sort} onSort={handleSort} />
                 <Th label="Subscribers"        col="subscribers"        sort={sort} onSort={handleSort} />
-                <Th label="Total Views"        col="total_views"        sort={sort} onSort={handleSort} />
+                <Th label="Views in this time range" col={isPeriodMode ? 'views_in_period' : 'total_views'} sort={sort} onSort={handleSort} />
+                {isPeriodMode && (
+                  <Th label="Subs (Period)"   col="subscribers_in_period" sort={sort} onSort={handleSort} />
+                )}
                 <Th label="Videos"             col="video_count"        sort={sort} onSort={handleSort} />
                 <Th label="Avg Views/Video"    col="avg_views_per_video" sort={sort} onSort={handleSort} />
                 <Th label="Tags"               col="tags"               sort={sort} onSort={handleSort} />
@@ -373,9 +453,9 @@ function ChannelReport() {
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={12} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={isPeriodMode ? 13 : 12} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={12} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
+                <tr><td colSpan={isPeriodMode ? 13 : 12} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_channel_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -390,7 +470,12 @@ function ChannelReport() {
                   </td>
                   <td className="px-3 py-2.5 text-dark-300">{r.country || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.subscribers)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono">{fmt(r.total_views)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-accent-300">
+                    {fmt(isPeriodMode ? r.views_in_period : r.total_views)}
+                  </td>
+                  {isPeriodMode && (
+                    <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.subscribers_in_period)}</td>
+                  )}
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.video_count)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.avg_views_per_video)}</td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs max-w-[140px] truncate" title={r.tags}>{r.tags || '—'}</td>
@@ -411,11 +496,12 @@ function ChannelReport() {
    Category Views Report Tab
 ═══════════════════════════════════════════════════════════════════ */
 function CategoryReport() {
+  const monthRange = getCurrentMonthRange();
   // ── server-filter state (passed to the API) ───────────────────────────────
   const [statusFilter, setStatusFilter] = useState('');   // active | paused | archived | ''
   const [tagsFilter,   setTagsFilter]   = useState('');
-  const [startDate,    setStartDate]    = useState('');
-  const [endDate,      setEndDate]      = useState('');
+  const [startDate,    setStartDate]    = useState(monthRange.startDate);
+  const [endDate,      setEndDate]      = useState(monthRange.endDate);
 
   // channel autocomplete (maps to the `category` filter on the server — we
   // actually want to filter channels by a selected category name, which the
@@ -430,7 +516,7 @@ function CategoryReport() {
   // ── display state ─────────────────────────────────────────────────────────
   const [rows,        setRows]        = useState([]);
   const [loading,     setLoading]     = useState(false);
-  const [sort,        setSort]        = useState('viewsPerSub');
+  const [sort,        setSort]        = useState('totalViews');
   const [sortDir,     setSortDir]     = useState('desc');
   const [search,      setSearch]      = useState('');      // client-side category name filter
   const [groupFilter, setGroupFilter] = useState('');      // '' | 'dedicated' | 'ihi'
@@ -487,10 +573,12 @@ function CategoryReport() {
   const clearAllFilters = () => {
     setStatusFilter('');
     setTagsFilter('');
-    setStartDate('');
-    setEndDate('');
+    const { startDate: sd, endDate: ed } = getCurrentMonthRange();
+    setStartDate(sd);
+    setEndDate(ed);
     setGroupFilter('');
     clearChannel();
+    fetchData('', '', sd, ed);
   };
 
   const hasFilters = statusFilter || tagsFilter || selectedChannel || groupFilter || startDate || endDate;
@@ -589,21 +677,56 @@ function CategoryReport() {
 
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
-        {/* Category name search */}
-        <div className="relative flex-1 min-w-48 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-          <input
-            type="text"
-            placeholder="Filter categories…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); if (selectedChannel) clearChannel(); }}
-            className="input-field pl-9 w-full text-sm"
-          />
-          {search && !selectedChannel && (
-            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+        {/* Search + Date range */}
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+          <div className="relative min-w-48 max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+            <input
+              type="text"
+              placeholder="Filter categories…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); if (selectedChannel) clearChannel(); }}
+              className="input-field pl-9 w-full text-sm"
+            />
+            {search && !selectedChannel && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(e) => { setStartDate(e.target.value); fetchData(statusFilter, tagsFilter, e.target.value, endDate); }}
+              className="input-field text-sm w-36"
+              title="From"
+            />
+            <span className="text-dark-500 text-sm">→</span>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, startDate, e.target.value); }}
+              className="input-field text-sm w-36"
+              title="To"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  const { startDate: sd, endDate: ed } = getCurrentMonthRange();
+                  setStartDate(sd);
+                  setEndDate(ed);
+                  fetchData(statusFilter, tagsFilter, sd, ed);
+                }}
+                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
+                title="Reset to current month"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -718,18 +841,6 @@ function CategoryReport() {
               ))}
             </div>
           </div>
-
-          {/* Date range — filters by channel lastSyncedAt */}
-          <div className="sm:col-span-3 pt-1 border-t border-dark-700/50">
-            <DateRangeFilter
-              startDate={startDate}
-              endDate={endDate}
-              onStartDate={(v) => { setStartDate(v); fetchData(statusFilter, tagsFilter, v, endDate); }}
-              onEndDate={(v) => { setEndDate(v); fetchData(statusFilter, tagsFilter, startDate, v); }}
-              onClear={() => { setStartDate(''); setEndDate(''); fetchData(statusFilter, tagsFilter, '', ''); }}
-            />
-            <p className="text-xs text-dark-500 mt-1.5">Filters categories by channels' last sync date.</p>
-          </div>
         </div>
       )}
 
@@ -737,15 +848,15 @@ function CategoryReport() {
       {!loading && displayed.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Categories',           value: displayed.length.toLocaleString() },
-            { label: 'Total Channels',        value: fmt(totals.channels) },
-            { label: 'Total Subscribers',     value: fmt(totals.subs) },
-            { label: 'Total Views',           value: fmt(totals.views) },
-            { label: 'Overall Views / Sub',   value: overallViewsPerSub.toFixed(2) },
-          ].map(({ label, value }) => (
+            { label: 'Views in this time range', value: fmt(totals.views) },
+            { label: 'Categories',               value: displayed.length.toLocaleString() },
+            { label: 'Total Channels',           value: fmt(totals.channels) },
+            { label: 'Total Subscribers',        value: fmt(totals.subs) },
+            { label: 'Overall Views / Sub',      value: overallViewsPerSub.toFixed(2) },
+          ].map(({ label, value }, idx) => (
             <div key={label} className="glass-card px-4 py-3">
               <p className="text-xs text-dark-400 mb-1">{label}</p>
-              <p className="text-lg font-semibold font-mono">{value}</p>
+              <p className={`text-lg font-semibold font-mono ${idx === 0 ? 'text-accent-400' : ''}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -761,7 +872,7 @@ function CategoryReport() {
                 <CTh label="Category"            col="category"    />
                 <CTh label="Channels"            col="count"       />
                 <CTh label="Total Subscribers"   col="totalSubs"   />
-                <CTh label="Total Views"         col="totalViews"  />
+                <CTh label="Views in this time range" col="totalViews"  />
                 <CTh label="Avg Views / Channel" col="avgViews"    />
                 <CTh
                   label="Views / Subscriber"
