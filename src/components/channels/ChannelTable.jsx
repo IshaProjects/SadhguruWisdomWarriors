@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Sparkles } from 'lucide-react';
 import { formatNumber, formatRelativeDate } from '../../utils/formatters.js';
 import clsx from 'clsx';
 
@@ -13,13 +13,14 @@ export default function ChannelTable({
   channels,
   onEdit,
   onDelete,
+  onClassify,
   // bulk-select props
   selectedIds = new Set(),
   onToggleSelect,
   onToggleAll,
 }) {
   const navigate      = useNavigate();
-  const showActions   = !!(onEdit || onDelete);
+  const showActions   = !!(onEdit || onDelete || onClassify);
   const showCheckbox  = !!(onToggleSelect && onToggleAll);
   const allSelected   = channels.length > 0 && channels.every((ch) => selectedIds.has(ch._id));
   const someSelected  = channels.some((ch) => selectedIds.has(ch._id));
@@ -115,6 +116,17 @@ export default function ChannelTable({
                 {showActions && (
                   <td className="py-3 px-3 text-right">
                     <div className="inline-flex items-center gap-1">
+                      {onClassify && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onClassify(ch); }}
+                          className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-accent-400"
+                          aria-label="Classify videos"
+                          title="Classify videos as Sadguru or not"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                        </button>
+                      )}
                       {onEdit && (
                         <button
                           type="button"

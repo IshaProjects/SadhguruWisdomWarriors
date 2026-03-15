@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { formatNumber } from '../../utils/formatters.js';
 import clsx from 'clsx';
 
@@ -8,13 +9,13 @@ const statusColors = {
   archived: 'bg-dark-600/20 text-dark-400',
 };
 
-export default function ChannelCard({ channel }) {
+export default function ChannelCard({ channel, onClassify }) {
   const navigate = useNavigate();
 
   return (
     <div
       onClick={() => navigate(`/channels/${channel._id}`)}
-      className="glass-card p-4 cursor-pointer hover:border-accent-500/30 transition-all duration-200 group"
+      className="glass-card p-4 cursor-pointer hover:border-accent-500/30 transition-all duration-200 group relative"
     >
       <div className="flex items-start gap-3">
         <img
@@ -30,9 +31,22 @@ export default function ChannelCard({ channel }) {
             {channel.customUrl || channel.youtubeChannelId}
           </p>
         </div>
-        <span className={clsx('badge text-[10px]', statusColors[channel.status])}>
-          {channel.status}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {onClassify && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onClassify(channel); }}
+              className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-accent-400"
+              aria-label="Classify videos"
+              title="Classify videos as Sadguru or not"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className={clsx('badge text-[10px]', statusColors[channel.status])}>
+            {channel.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 mt-4">

@@ -3,7 +3,7 @@ import { formatNumber, formatPercentChange } from '../../utils/formatters.js';
 import InfoTooltip from './InfoTooltip.jsx';
 import clsx from 'clsx';
 
-export default function StatCard({ title, value, change, icon: Icon, format = true, tooltip }) {
+export default function StatCard({ title, value, change, icon: Icon, format = true, tooltip, subtitle }) {
   const displayValue = format ? formatNumber(value) : value;
   const changeInfo = formatPercentChange(change);
 
@@ -16,6 +16,7 @@ export default function StatCard({ title, value, change, icon: Icon, format = tr
             {tooltip && <InfoTooltip text={tooltip} side="top" />}
           </div>
           <p className="text-2xl font-bold mt-1 animate-count-up">{displayValue}</p>
+          {subtitle && <p className="text-xs text-dark-400 mt-1">{subtitle}</p>}
         </div>
         {Icon && (
           <div className="p-2.5 rounded-lg bg-accent-500/10 shrink-0 ml-3">

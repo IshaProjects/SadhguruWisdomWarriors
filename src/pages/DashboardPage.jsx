@@ -41,6 +41,7 @@ export default function DashboardPage() {
     status: '',
     startDate: '',
     endDate: '',
+    group: '', // '' | 'ihi' | 'dedicated' — default shows both
   });
   const [summary, setSummary] = useState(null);
   const [growthData, setGrowthData] = useState([]);
@@ -55,6 +56,7 @@ export default function DashboardPage() {
   const buildParams = () => {
     const params = { period: filters.period };
     if (filters.category) params.category = filters.category;
+    if (filters.group) params.group = filters.group;
     const tagsTrimmed = filters.tags?.trim?.();
     if (tagsTrimmed) params.tags = tagsTrimmed;
     if (filters.status) params.status = filters.status;
@@ -130,8 +132,9 @@ export default function DashboardPage() {
           <FilterBar
             filters={filters}
             onFilterChange={setFilters}
-            showPeriod={true}
+            showPeriod={false}
             showDateRange={true}
+            showGroupFilter={true}
           />
         </div>
 

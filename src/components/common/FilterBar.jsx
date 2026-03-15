@@ -11,7 +11,7 @@ const periods = [
 
 const statuses = ['All', 'active', 'paused', 'archived'];
 
-export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false }) {
+export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false, showGroupFilter = false }) {
   const [showFilters, setShowFilters] = useState(false);
   const { categories: dbCategories, loading: catsLoading } = useCategories();
   const categories = ['All', ...dbCategories];
@@ -36,6 +36,33 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
+        {showGroupFilter && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-dark-400 shrink-0">Type:</span>
+            <div className="flex bg-dark-800 rounded-lg p-1">
+              {[
+                { value: '', label: 'All' },
+                { value: 'ihi', label: 'IHI' },
+                { value: 'dedicated', label: 'Dedicated' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value || 'all'}
+                  type="button"
+                  onClick={() => onFilterChange({ ...filters, group: value })}
+                  className={clsx(
+                    'px-3 py-1.5 text-sm rounded-md transition-colors',
+                    filters.group === value
+                      ? 'bg-accent-500 text-white'
+                      : 'text-dark-400 hover:text-dark-100'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {showPeriod && (
           <div className="flex bg-dark-800 rounded-lg p-1">
             {periods.map((p) => (
@@ -100,7 +127,7 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
 
         {/* Active filter tags */}
         {Object.entries(filters).map(([key, value]) => {
-          if (key === 'period' || key === 'startDate' || key === 'endDate') return null;
+          if (key === 'period' || key === 'startDate' || key === 'endDate' || key === 'group') return null;
           const str = typeof value === 'string' ? value.trim() : value;
           if (!str) return null;
           return (

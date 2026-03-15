@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X } from 'lucide-react';
+import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X, Sparkles } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import ChannelTable from '../components/channels/ChannelTable.jsx';
 import ChannelCard from '../components/channels/ChannelCard.jsx';
@@ -23,10 +23,19 @@ export default function ChannelsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingChannel, setEditingChannel]   = useState(null);
   const [deletingChannel, setDeletingChannel] = useState(null);
+  const [classifyingChannel, setClassifyingChannel] = useState(null);
+  const [classifying, setClassifying] = useState(false);
+  const [classificationSummary, setClassificationSummary] = useState(null);
   const [search, setSearch]     = useState('');
-  const [filters, setFilters]   = useState({ period: '30d', category: '', tags: '', status: '' });
+  const [filters, setFilters]   = useState({ period: '30d', category: '', tags: '', status: '', group: '' });
   const [sort, setSort]         = useState('-currentStats.subscribers');
   const [syncing, setSyncing]   = useState(false);
+  const [pullingAll, setPullingAll] = useState(false);
+  const [showPullAllModal, setShowPullAllModal] = useState(false);
+  const [pullAllResult, setPullAllResult] = useState(null);
+  const [classifyingAll, setClassifyingAll] = useState(false);
+  const [showClassifyAllModal, setShowClassifyAllModal] = useState(false);
+  const [classifyAllResult, setClassifyAllResult] = useState(null);
 
   // Bulk-select state
   const [selectedIds, setSelectedIds]         = useState(new Set());
@@ -39,6 +48,7 @@ export default function ChannelsPage() {
       const params = { page, limit: viewMode === 'grid' ? 24 : 25, sort };
       if (search) params.search = search;
       if (filters.category) params.category = filters.category;
+      if (filters.group) params.group = filters.group;
       const tagsTrimmed = filters.tags?.trim?.();
       if (tagsTrimmed) params.tags = tagsTrimmed;
       if (filters.status) params.status = filters.status;
@@ -115,6 +125,36 @@ export default function ChannelsPage() {
     }
   };
 
+  /* ── Classify All (all channels) ── */
+  const handleClassifyAll = async () => {
+    setClassifyingAll(true);
+    try {
+      const res = await api.post('/channels/classify-all');
+      setShowClassifyAllModal(false);
+      setClassifyAllResult(res.data);
+      fetchChannels(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Classify all failed');
+    } finally {
+      setClassifyingAll(false);
+    }
+  };
+
+  /* ── Pull All Videos (all channels) ── */
+  const handlePullAllVideos = async () => {
+    setPullingAll(true);
+    try {
+      const res = await api.post('/channels/pull-all-videos');
+      setShowPullAllModal(false);
+      setPullAllResult(res.data);
+      fetchChannels(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Pull all videos failed');
+    } finally {
+      setPullingAll(false);
+    }
+  };
+
   /* ── CSV Export ── */
   const handleExport = async () => {
     try {
@@ -148,6 +188,20 @@ export default function ChannelsPage() {
     }
   };
 
+  const handleClassify = async () => {
+    if (!classifyingChannel) return;
+    setClassifying(true);
+    try {
+      const res = await api.post(`/channels/${classifyingChannel._id}/classify-videos`);
+      setClassifyingChannel(null);
+      setClassificationSummary(res.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Classification failed');
+    } finally {
+      setClassifying(false);
+    }
+  };
+
   const canDelete = canPerformAction('channels.delete');
   const hasSelection = selectedIds.size > 0;
 
@@ -158,7 +212,7 @@ export default function ChannelsPage() {
 
         {/* ── Action Bar ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <FilterBar filters={filters} onFilterChange={setFilters} showPeriod={false} />
+          <FilterBar filters={filters} onFilterChange={setFilters} showPeriod={false} showGroupFilter={true} />
 
           <div className="flex items-center gap-2">
             <select
@@ -197,14 +251,34 @@ export default function ChannelsPage() {
             )}
 
             {canPerformAction('channels.sync') && (
-              <button
-                onClick={handleSyncAll}
-                disabled={syncing}
-                className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <RefreshCw className={clsx('w-4 h-4', syncing && 'animate-spin')} />
-                Sync All
-              </button>
+              <>
+                <button
+                  onClick={() => setShowClassifyAllModal(true)}
+                  disabled={classifyingAll}
+                  className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+                  title="Classify all videos for all channels (Dedicated = sadguru, IHI/other = AI)"
+                >
+                  <Sparkles className={clsx('w-4 h-4', classifyingAll && 'animate-pulse')} />
+                  Classify All
+                </button>
+                <button
+                  onClick={() => setShowPullAllModal(true)}
+                  disabled={pullingAll}
+                  className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+                  title="Pull all videos for all channels (one at a time, 100 per batch)"
+                >
+                  <Download className={clsx('w-4 h-4', pullingAll && 'animate-pulse')} />
+                  Pull All Videos
+                </button>
+                <button
+                  onClick={handleSyncAll}
+                  disabled={syncing}
+                  className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className={clsx('w-4 h-4', syncing && 'animate-spin')} />
+                  Sync All
+                </button>
+              </>
             )}
 
             {canPerformAction('channels.import') && (
@@ -258,6 +332,7 @@ export default function ChannelsPage() {
               channels={channels}
               onEdit={canPerformAction('channels.edit') ? (ch) => setEditingChannel(ch) : null}
               onDelete={canPerformAction('channels.delete') ? (ch) => setDeletingChannel(ch) : null}
+              onClassify={canPerformAction('channels.sync') ? (ch) => setClassifyingChannel(ch) : null}
               selectedIds={selectedIds}
               onToggleSelect={canDelete ? handleToggleSelect : null}
               onToggleAll={canDelete ? handleToggleAll : null}
@@ -266,7 +341,11 @@ export default function ChannelsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {channels.map((ch) => (
-              <ChannelCard key={ch._id} channel={ch} />
+              <ChannelCard
+                key={ch._id}
+                channel={ch}
+                onClassify={canPerformAction('channels.sync') ? (ch) => setClassifyingChannel(ch) : null}
+              />
             ))}
           </div>
         )}
@@ -294,6 +373,282 @@ export default function ChannelsPage() {
             onClose={() => setEditingChannel(null)}
             onSaved={handleChannelUpdated}
           />
+        )}
+
+        {/* ── Classify All confirmation ── */}
+        {showClassifyAllModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2">Classify All Videos</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Classify all videos for all channels? Dedicated channels will be marked as Sadguru automatically. IHI and other channels will use AI (Vertex AI / Gemini) to classify each video.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowClassifyAllModal(false)}
+                  disabled={classifyingAll}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-1.5"
+                  onClick={handleClassifyAll}
+                  disabled={classifyingAll}
+                >
+                  {classifyingAll ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Classifying…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Classify All
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Classify All result ── */}
+        {classifyAllResult && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-4">Classification Complete</h2>
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Channels processed</span>
+                  <span className="font-medium">{classifyAllResult.channelsProcessed}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Total videos</span>
+                  <span className="font-medium">{classifyAllResult.totalVideos}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Newly classified</span>
+                  <span className="font-medium text-green-400">{classifyAllResult.totalNewlyClassified}</span>
+                </p>
+                {classifyAllResult.totalNewlyClassified > 0 && (
+                  <>
+                    <p className="flex justify-between pt-2 border-t border-dark-700">
+                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="font-medium text-green-400">{classifyAllResult.totalSadguru}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-dark-400">→ Non sadguru</span>
+                      <span className="font-medium">{classifyAllResult.totalNonSadguru}</span>
+                    </p>
+                  </>
+                )}
+                {classifyAllResult.totalFailed > 0 && (
+                  <p className="flex justify-between">
+                    <span className="text-dark-400">Could not process</span>
+                    <span className="font-medium text-red-400">{classifyAllResult.totalFailed}</span>
+                  </p>
+                )}
+                {classifyAllResult.errors?.length > 0 && (
+                  <div className="pt-2 border-t border-dark-700">
+                    <p className="text-dark-400 mb-2">Errors:</p>
+                    <ul className="text-xs text-red-400 space-y-1 max-h-24 overflow-y-auto">
+                      {classifyAllResult.errors.map((e, i) => (
+                        <li key={i}>{e.title}: {e.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setClassifyAllResult(null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Pull All Videos confirmation ── */}
+        {showPullAllModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2">Pull All Videos</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Pull video details for all channels that haven&apos;t been fully pulled yet? This will process one channel at a time, 100 videos per batch. It may take a while and will use YouTube API quota.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowPullAllModal(false)}
+                  disabled={pullingAll}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-1.5"
+                  onClick={handlePullAllVideos}
+                  disabled={pullingAll}
+                >
+                  {pullingAll ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Pulling…
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Pull All Videos
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Pull All Videos result ── */}
+        {pullAllResult && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-4">Pull Complete</h2>
+              {pullAllResult.message && (
+                <p className="text-sm text-dark-300 mb-4">{pullAllResult.message}</p>
+              )}
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Channels processed</span>
+                  <span className="font-medium">{pullAllResult.channelsProcessed}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Total videos pulled</span>
+                  <span className="font-medium text-green-400">{pullAllResult.totalVideosPulled}</span>
+                </p>
+                {pullAllResult.errors?.length > 0 && (
+                  <div className="pt-2 border-t border-dark-700">
+                    <p className="text-dark-400 mb-2">Errors:</p>
+                    <ul className="text-xs text-red-400 space-y-1 max-h-24 overflow-y-auto">
+                      {pullAllResult.errors.map((e, i) => (
+                        <li key={i}>{e.title}: {e.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setPullAllResult(null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Classify confirmation ── */}
+        {classifyingChannel && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2">Classify Videos</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Classify all videos for <span className="font-semibold">{classifyingChannel.title}</span> as Sadguru video or not? Each video title will be sent to Vertex AI to determine if it features Sadguru content.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setClassifyingChannel(null)}
+                  disabled={classifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-1.5"
+                  onClick={handleClassify}
+                  disabled={classifying}
+                >
+                  {classifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Classifying…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Classify
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Classification Summary ── */}
+        {classificationSummary && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-4">Classification Complete</h2>
+              {classificationSummary.isSadhguruChannel && (
+                <p className="text-sm text-accent-300 mb-4 p-3 rounded-lg bg-accent-500/10">
+                  This is a Sadguru (Dedicated) channel. All unclassified videos were marked as sadguru by default — no AI call was needed.
+                </p>
+              )}
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Total videos</span>
+                  <span className="font-medium">{classificationSummary.totalVideos}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Already classified</span>
+                  <span className="font-medium">{classificationSummary.alreadyClassified}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Newly classified</span>
+                  <span className="font-medium text-green-400">{classificationSummary.newlyClassified}</span>
+                </p>
+                {classificationSummary.failed > 0 && (
+                  <p className="flex justify-between">
+                    <span className="text-dark-400">Could not process</span>
+                    <span className="font-medium text-red-400">{classificationSummary.failed}</span>
+                  </p>
+                )}
+                {!classificationSummary.isSadhguruChannel && classificationSummary.newlyClassified > 0 && (
+                  <>
+                    <p className="flex justify-between pt-2 border-t border-dark-700">
+                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="font-medium text-green-400">{classificationSummary.sadhguruCount}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-dark-400">→ Non sadhguru</span>
+                      <span className="font-medium">{classificationSummary.nonSadguruCount}</span>
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setClassificationSummary(null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── Single delete confirmation ── */}

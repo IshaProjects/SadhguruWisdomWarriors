@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Save,
   TrendingUp,
+  Sparkles,
+  Download,
 } from 'lucide-react';
 import {
   LineChart,
@@ -39,10 +41,16 @@ export default function ChannelDetailPage() {
   const [channel, setChannel] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [videoCountInDb, setVideoCountInDb] = useState(null);
   const [videoTrends, setVideoTrends] = useState(null);
   const [trendPeriod, setTrendPeriod] = useState('30');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [showPullModal, setShowPullModal] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [showClassifyModal, setShowClassifyModal] = useState(false);
+  const [classificationSummary, setClassificationSummary] = useState(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
@@ -53,6 +61,7 @@ export default function ChannelDetailPage() {
         setChannel(res.data.channel);
         setSnapshots(res.data.snapshots);
         setVideos(res.data.videos);
+        setVideoCountInDb(res.data.videoCountInDb ?? null);
         setEditForm({
           category: res.data.channel.category,
           tags: res.data.channel.tags?.join(', ') || '',
@@ -97,6 +106,7 @@ export default function ChannelDetailPage() {
       setChannel(res.data.channel);
       setSnapshots(res.data.snapshots);
       setVideos(res.data.videos);
+      setVideoCountInDb(res.data.videoCountInDb ?? null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Sync failed');
     } finally {
@@ -117,6 +127,38 @@ export default function ChannelDetailPage() {
       toast.success('Channel updated');
     } catch {
       toast.error('Update failed');
+    }
+  };
+
+  const handlePullAllVideos = async () => {
+    setPulling(true);
+    try {
+      const res = await api.post(`/channels/${id}/pull-videos`);
+      setShowPullModal(false);
+      toast.success(`Pulled ${res.data.videosProcessed} videos`);
+      const chRes = await api.get(`/channels/${id}`);
+      setChannel(chRes.data.channel);
+      setVideos(chRes.data.videos);
+      setVideoCountInDb(chRes.data.videoCountInDb ?? null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Pull failed');
+    } finally {
+      setPulling(false);
+    }
+  };
+
+  const handleClassify = async () => {
+    setClassifying(true);
+    try {
+      const res = await api.post(`/channels/${id}/classify-videos`);
+      setShowClassifyModal(false);
+      setClassificationSummary(res.data);
+      const chRes = await api.get(`/channels/${id}`);
+      setVideos(chRes.data.videos);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Classification failed');
+    } finally {
+      setClassifying(false);
     }
   };
 
@@ -150,6 +192,24 @@ export default function ChannelDetailPage() {
             <ArrowLeft className="w-4 h-4" /> Back to Channels
           </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPullModal(true)}
+              disabled={pulling || channel.allVideosPulled}
+              className="btn-secondary text-sm flex items-center gap-1.5"
+              title={channel.allVideosPulled ? 'All videos already pulled' : 'Pull all videos for this channel in batches of 100'}
+            >
+              <Download className={clsx('w-4 h-4', pulling && 'animate-pulse')} />
+              {channel.allVideosPulled ? 'All Videos Pulled' : 'Pull All Videos'}
+            </button>
+            <button
+              onClick={() => setShowClassifyModal(true)}
+              disabled={classifying || videos.length === 0}
+              className="btn-secondary text-sm flex items-center gap-1.5"
+              title="Classify videos as Sadguru or not using AI"
+            >
+              <Sparkles className={clsx('w-4 h-4', classifying && 'animate-pulse')} />
+              Classify
+            </button>
             <button
               onClick={handleSync}
               disabled={syncing}
@@ -221,6 +281,8 @@ export default function ChannelDetailPage() {
             title="Total Videos"
             value={channel.currentStats?.videoCount}
             icon={Film}
+            tooltip="YouTube total vs videos in our database"
+            subtitle={videoCountInDb != null ? `${formatNumber(videoCountInDb)} in our DB` : null}
           />
           <StatCard
             title="Joined"
@@ -498,6 +560,12 @@ export default function ChannelDetailPage() {
               <thead>
                 <tr className="border-b border-dark-700">
                   <th className="text-left py-2 px-2 text-dark-400 font-medium">Video</th>
+                  <th
+                    className="text-center py-2 px-2 text-dark-400 font-medium cursor-help"
+                    title="Classification: sadguru / non sadhguru. Click Classify to run."
+                  >
+                    Classification
+                  </th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Views</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Likes</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Comments</th>
@@ -535,6 +603,20 @@ export default function ChannelDetailPage() {
                             <span className="font-medium truncate max-w-[250px]">{v.title}</span>
                           </div>
                         </td>
+                        <td className="py-2.5 px-2 text-center">
+                          {((v.classification === 'sadhguru') || (v.isSadguruVideo === true)) && (
+                            <span className="badge bg-green-500/20 text-green-300 text-xs">sadhguru</span>
+                          )}
+                          {((v.classification === 'non sadhguru') || (v.isSadguruVideo === false)) && (
+                            <span className="badge bg-dark-700 text-dark-400 text-xs">non sadhguru</span>
+                          )}
+                          {(!v.classification || v.classification.trim() === '') && v.isSadguruVideo == null && (
+                            <span className="text-dark-500 text-xs">—</span>
+                          )}
+                          {v.classification && v.classification !== 'sadhguru' && v.classification !== 'non sadhguru' && (
+                            <span className="badge bg-accent-500/20 text-accent-300 text-xs">{v.classification}</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-2 text-right">{formatNumber(v.views)}</td>
                         <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.likes)}</td>
                         <td className="py-2.5 px-2 text-right text-dark-300">{formatNumber(v.comments)}</td>
@@ -559,7 +641,7 @@ export default function ChannelDetailPage() {
                 })()}
                 {videos.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-dark-400">
+                    <td colSpan={9} className="py-8 text-center text-dark-400">
                       No videos synced yet. Run a sync to fetch videos.
                     </td>
                   </tr>
@@ -568,6 +650,141 @@ export default function ChannelDetailPage() {
             </table>
           </div>
         </div>
+
+        {/* Pull All Videos Modal */}
+        {showPullModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2">Pull All Videos</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Do you want to pull all videos for this channel? This will fetch video details (title, description, views, likes, comments, duration, etc.) in batches of 100. This may take a while for channels with many videos.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowPullModal(false)}
+                  disabled={pulling}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-1.5"
+                  onClick={handlePullAllVideos}
+                  disabled={pulling}
+                >
+                  {pulling ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Pulling…
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Pull All Videos
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Classify Videos Modal */}
+        {showClassifyModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2">Classify Videos</h2>
+              <p className="text-sm text-dark-300 mb-4">
+                Classify all videos for this channel as Sadguru video or not. Each video title will be sent to Vertex AI to determine if it features Sadguru content. Results will be saved for every video.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowClassifyModal(false)}
+                  disabled={classifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex items-center gap-1.5"
+                  onClick={handleClassify}
+                  disabled={classifying}
+                >
+                  {classifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Classifying…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Classify
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Classification Summary Modal */}
+        {classificationSummary && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-4">Classification Complete</h2>
+              {classificationSummary.isSadhguruChannel && (
+                <p className="text-sm text-accent-300 mb-4 p-3 rounded-lg bg-accent-500/10">
+                  This is a Sadguru (Dedicated) channel. All unclassified videos were marked as sadguru by default — no AI call was needed.
+                </p>
+              )}
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Total videos</span>
+                  <span className="font-medium">{classificationSummary.totalVideos}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Already classified</span>
+                  <span className="font-medium">{classificationSummary.alreadyClassified}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Newly classified</span>
+                  <span className="font-medium text-green-400">{classificationSummary.newlyClassified}</span>
+                </p>
+                {classificationSummary.failed > 0 && (
+                  <p className="flex justify-between">
+                    <span className="text-dark-400">Could not process</span>
+                    <span className="font-medium text-red-400">{classificationSummary.failed}</span>
+                  </p>
+                )}
+                {!classificationSummary.isSadhguruChannel && classificationSummary.newlyClassified > 0 && (
+                  <>
+                    <p className="flex justify-between pt-2 border-t border-dark-700">
+                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="font-medium text-green-400">{classificationSummary.sadhguruCount}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-dark-400">→ Non sadhguru</span>
+                      <span className="font-medium">{classificationSummary.nonSadguruCount}</span>
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setClassificationSummary(null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
