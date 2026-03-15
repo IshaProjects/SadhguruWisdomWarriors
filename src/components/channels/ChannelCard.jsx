@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Check } from 'lucide-react';
 import { formatNumber } from '../../utils/formatters.js';
 import clsx from 'clsx';
 
@@ -32,6 +32,11 @@ export default function ChannelCard({ channel, onClassify }) {
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {channel.classificationDone && (
+            <span className="p-1 rounded bg-green-500/20 text-green-400" title="Classification done">
+              <Check className="w-3.5 h-3.5" />
+            </span>
+          )}
           {onClassify && (
             <button
               type="button"

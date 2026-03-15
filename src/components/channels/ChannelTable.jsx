@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2, Sparkles } from 'lucide-react';
+import { Pencil, Trash2, Sparkles, Check } from 'lucide-react';
 import { formatNumber, formatRelativeDate } from '../../utils/formatters.js';
 import clsx from 'clsx';
 
@@ -44,6 +44,7 @@ export default function ChannelTable({
               </th>
             )}
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Channel</th>
+            <th className="text-center py-3 px-3 text-dark-400 font-medium w-24">Classified</th>
             <th className="text-right py-3 px-3 text-dark-400 font-medium">Subscribers</th>
             <th className="text-right py-3 px-3 text-dark-400 font-medium">Views</th>
             <th className="text-right py-3 px-3 text-dark-400 font-medium">Videos</th>
@@ -91,6 +92,13 @@ export default function ChannelTable({
                       <p className="text-xs text-dark-400 truncate">{ch.customUrl || ch.youtubeChannelId}</p>
                     </div>
                   </div>
+                </td>
+                <td className="py-3 px-3 text-center">
+                  {ch.classificationDone ? (
+                    <Check className="w-4 h-4 text-green-400 mx-auto" aria-label="Classification done" title="Classification done" />
+                  ) : (
+                    <span className="text-dark-500 text-xs">—</span>
+                  )}
                 </td>
                 <td className="py-3 px-3 text-right font-medium">
                   {formatNumber(ch.currentStats?.subscribers)}
@@ -153,10 +161,10 @@ export default function ChannelTable({
               </tr>
             );
           })}
-          {channels.length === 0 && (
+            {channels.length === 0 && (
             <tr>
               <td
-                colSpan={(showCheckbox ? 1 : 0) + (showActions ? 9 : 8)}
+                colSpan={(showCheckbox ? 1 : 0) + (showActions ? 10 : 9)}
                 className="py-12 text-center text-dark-400"
               >
                 No channels found. Add your first channel to get started.
