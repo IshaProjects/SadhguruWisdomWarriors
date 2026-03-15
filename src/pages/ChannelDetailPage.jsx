@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -12,6 +12,13 @@ import {
   TrendingUp,
   Sparkles,
   Download,
+  LayoutDashboard,
+  Video,
+  Search,
+  Filter,
+  X,
+  Heart,
+  MessageCircle,
 } from 'lucide-react';
 import {
   LineChart,
@@ -53,6 +60,47 @@ export default function ChannelDetailPage() {
   const [classificationSummary, setClassificationSummary] = useState(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+
+  // Videos tab state
+  const [activeTab, setActiveTab] = useState('videos');
+  const [videosSearch, setVideosSearch] = useState('');
+  const [videosClassification, setVideosClassification] = useState('');
+  const [videosSort, setVideosSort] = useState('-views');
+  const [videosPage, setVideosPage] = useState(1);
+  const [videosData, setVideosData] = useState({ videos: [], pagination: null, summary: null });
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosShowFilters, setVideosShowFilters] = useState(false);
+  const [videosMinViews, setVideosMinViews] = useState('');
+  const [videosMaxViews, setVideosMaxViews] = useState('');
+
+  const fetchChannelVideos = useCallback(async (overrides = {}) => {
+    if (!id) return;
+    setVideosLoading(true);
+    try {
+      const page = overrides.page ?? videosPage;
+      const sort = overrides.sort ?? videosSort;
+      const search = overrides.search ?? videosSearch;
+      const classification = overrides.classification ?? videosClassification;
+      const minViews = overrides.minViews ?? videosMinViews;
+      const maxViews = overrides.maxViews ?? videosMaxViews;
+      const params = { page, limit: 50, sort };
+      if (search?.trim()) params.search = search.trim();
+      if (classification) params.classification = classification;
+      if (minViews) params.minViews = minViews;
+      if (maxViews) params.maxViews = maxViews;
+      const res = await api.get(`/channels/${id}/videos`, { params });
+      const summary = res.data.summary ?? { totalVideos: 0, totalViews: 0, totalLikes: 0, totalComments: 0 };
+      setVideosData({ videos: res.data.videos, pagination: res.data.pagination, summary });
+    } catch {
+      toast.error('Failed to load videos');
+    } finally {
+      setVideosLoading(false);
+    }
+  }, [id, videosPage, videosSort, videosSearch, videosClassification, videosMinViews, videosMaxViews]);
+
+  useEffect(() => {
+    if (activeTab === 'videos' && id && !loading) fetchChannelVideos();
+  }, [activeTab, id, videosPage, videosSort, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const fetchChannel = async () => {
@@ -229,6 +277,31 @@ export default function ChannelDetailPage() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-dark-700">
+          {[
+            { id: 'videos', label: 'All Videos', Icon: Video },
+            { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+          ].map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={clsx(
+                'flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+                activeTab === id
+                  ? 'border-accent-500 text-accent-400'
+                  : 'border-transparent text-dark-400 hover:text-dark-200'
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+        <>
         {/* Channel Header */}
         <div className="glass-card p-6">
           <div className="flex items-start gap-4">
@@ -650,6 +723,235 @@ export default function ChannelDetailPage() {
             </table>
           </div>
         </div>
+        </>
+        )}
+
+        {/* Videos Tab */}
+        {activeTab === 'videos' && (
+        <div className="space-y-4">
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {videosLoading ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="glass-card p-5 animate-pulse">
+                  <div className="h-4 bg-dark-700 rounded w-24 mb-2" />
+                  <div className="h-8 bg-dark-700 rounded w-16" />
+                </div>
+              ))
+            ) : videosData.summary ? (
+              <>
+                <StatCard title="Videos" value={videosData.summary.totalVideos} icon={Film} />
+                <StatCard title="Total Views" value={videosData.summary.totalViews} icon={Eye} />
+                <StatCard title="Total Likes" value={videosData.summary.totalLikes} icon={Heart} />
+                <StatCard title="Total Comments" value={videosData.summary.totalComments} icon={MessageCircle} />
+              </>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 justify-between">
+            <div className="relative flex-1 min-w-52 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+              <input
+                type="text"
+                placeholder="Search video titles…"
+                value={videosSearch}
+                onChange={(e) => setVideosSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (setVideosPage(1), fetchChannelVideos({ page: 1 }))}
+                className="input-field pl-9 pr-9 w-full text-sm"
+              />
+              {videosSearch && (
+                <button
+                  onClick={() => { setVideosSearch(''); setVideosPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setVideosShowFilters((v) => !v)}
+                className={clsx('btn-ghost flex items-center gap-2 text-sm', videosShowFilters && 'text-accent-400')}
+              >
+                <Filter className="w-4 h-4" /> Filters
+              </button>
+              <button
+                onClick={() => fetchChannelVideos()}
+                className="btn-ghost p-2"
+                title="Refresh"
+              >
+                <RefreshCw className={clsx('w-4 h-4', videosLoading && 'animate-spin')} />
+              </button>
+              <button
+                onClick={() => {
+                  setVideosSearch('');
+                  setVideosClassification('');
+                  setVideosMinViews('');
+                  setVideosMaxViews('');
+                  setVideosPage(1);
+                  fetchChannelVideos({ search: '', classification: '', minViews: '', maxViews: '', page: 1 });
+                }}
+                className="btn-ghost text-xs text-dark-400 flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" /> Clear
+              </button>
+            </div>
+          </div>
+
+          {videosShowFilters && (
+            <div className="glass-card p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Classification</label>
+                <select
+                  value={videosClassification}
+                  onChange={(e) => { setVideosClassification(e.target.value); setVideosPage(1); }}
+                  className="input-field text-sm w-full"
+                >
+                  <option value="">All</option>
+                  <option value="sadhguru">Sadhguru</option>
+                  <option value="non_sadhguru">Non Sadhguru</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Min Views</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={videosMinViews}
+                  onChange={(e) => setVideosMinViews(e.target.value)}
+                  className="input-field text-sm w-full"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-dark-400 mb-1">Max Views</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={videosMaxViews}
+                  onChange={(e) => setVideosMaxViews(e.target.value)}
+                  className="input-field text-sm w-full"
+                  placeholder="∞"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => fetchChannelVideos()}
+                  className="btn-secondary text-sm w-full"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-dark-800/60">
+                  <tr>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide w-8">#</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide">Video</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide">Classification</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide cursor-pointer hover:text-dark-200" onClick={() => { const s = videosSort === '-views' ? 'views' : '-views'; setVideosSort(s); setVideosPage(1); fetchChannelVideos({ sort: s, page: 1 }); }}>
+                      Views {videosSort === '-views' ? '↓' : videosSort === 'views' ? '↑' : ''}
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide cursor-pointer hover:text-dark-200" onClick={() => { const s = videosSort === '-likes' ? 'likes' : '-likes'; setVideosSort(s); setVideosPage(1); fetchChannelVideos({ sort: s, page: 1 }); }}>
+                      Likes {videosSort === '-likes' ? '↓' : videosSort === 'likes' ? '↑' : ''}
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide cursor-pointer hover:text-dark-200" onClick={() => { const s = videosSort === '-comments' ? 'comments' : '-comments'; setVideosSort(s); setVideosPage(1); fetchChannelVideos({ sort: s, page: 1 }); }}>
+                      Comments {videosSort === '-comments' ? '↓' : videosSort === 'comments' ? '↑' : ''}
+                    </th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide">Eng. Rate</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide">Duration</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-dark-400 uppercase tracking-wide cursor-pointer hover:text-dark-200" onClick={() => { const s = videosSort === '-publishedAt' ? 'publishedAt' : '-publishedAt'; setVideosSort(s); setVideosPage(1); fetchChannelVideos({ sort: s, page: 1 }); }}>
+                      Published {videosSort === '-publishedAt' ? '↓' : videosSort === 'publishedAt' ? '↑' : ''}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-700/50">
+                  {videosLoading ? (
+                    <tr><td colSpan={10} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                  ) : videosData.videos.length === 0 ? (
+                    <tr><td colSpan={10} className="text-center py-12 text-dark-400">No videos found.</td></tr>
+                  ) : (() => {
+                    const avgViews = videosData.videos.length
+                      ? videosData.videos.reduce((s, v) => s + (v.views || 0), 0) / videosData.videos.length
+                      : 0;
+                    return videosData.videos.map((v, i) => {
+                      const score = avgViews > 0 ? v.views / avgViews : null;
+                      const scoreBadge = score != null ? (
+                        score >= 3 ? { label: `${score.toFixed(1)}×`, cls: 'bg-green-500/20 text-green-300' } :
+                        score >= 1.5 ? { label: `${score.toFixed(1)}×`, cls: 'bg-emerald-500/15 text-emerald-400' } :
+                        score >= 0.75 ? { label: `${score.toFixed(1)}×`, cls: 'bg-dark-700 text-dark-300' } :
+                        score >= 0.5 ? { label: `${score.toFixed(1)}×`, cls: 'bg-yellow-500/15 text-yellow-400' } :
+                        { label: `${score.toFixed(1)}×`, cls: 'bg-red-500/15 text-red-400' }
+                      ) : null;
+                      return (
+                        <tr key={v._id} className="hover:bg-dark-800/40 transition-colors">
+                          <td className="px-3 py-2.5 text-dark-500 text-xs">{(videosData.pagination.page - 1) * videosData.pagination.limit + i + 1}</td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-3">
+                              {v.thumbnailUrl && (
+                                <img src={v.thumbnailUrl} alt="" className="w-16 h-9 rounded object-cover bg-dark-700 shrink-0" />
+                              )}
+                              <a
+                                href={`https://youtube.com/watch?v=${v.youtubeVideoId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium truncate max-w-[220px] hover:text-accent-400 transition-colors"
+                              >
+                                {v.title || '—'}
+                              </a>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {v.classification === 'sadhguru' && <span className="badge bg-green-500/20 text-green-400 text-xs">sadhguru</span>}
+                            {v.classification === 'non sadhguru' && <span className="badge bg-dark-700 text-dark-400 text-xs">non sadhguru</span>}
+                            {(!v.classification || !v.classification.trim()) && <span className="text-dark-500 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono">{formatNumber(v.views)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-dark-300">{formatNumber(v.likes)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-dark-300">{formatNumber(v.comments)}</td>
+                          <td className="px-3 py-2.5 text-right text-dark-300">
+                            {engagementRate(v.views, v.likes, v.comments).toFixed(2)}%
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-dark-400">{formatDuration(v.duration)}</td>
+                          <td className="px-3 py-2.5 text-right text-dark-400">{formatRelativeDate(v.publishedAt)}</td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+            {videosData.pagination && videosData.pagination.pages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700 text-sm text-dark-400">
+                <span>{videosData.pagination.total.toLocaleString()} total videos</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn-ghost px-2 py-1 text-xs disabled:opacity-40"
+                    disabled={videosData.pagination.page <= 1}
+                    onClick={() => setVideosPage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Prev
+                  </button>
+                  <span className="text-dark-300">
+                    Page {videosData.pagination.page} of {videosData.pagination.pages}
+                  </span>
+                  <button
+                    className="btn-ghost px-2 py-1 text-xs disabled:opacity-40"
+                    disabled={videosData.pagination.page >= videosData.pagination.pages}
+                    onClick={() => setVideosPage((p) => p + 1)}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* Pull All Videos Modal */}
         {showPullModal && (

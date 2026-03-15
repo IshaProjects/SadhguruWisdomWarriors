@@ -13,6 +13,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import RbacConfigPage from './pages/RbacConfigPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import AIStudioPage from './pages/AIStudioPage.jsx';
+import MicroUnitsPage from './pages/MicroUnitsPage.jsx';
 import LoadingSpinner from './components/common/LoadingSpinner.jsx';
 
 function ProtectedRoute({ children }) {
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/channels" element={<RbacRoute pageKey="channels"><ChannelsPage /></RbacRoute>} />
         <Route path="/channels/import" element={<RbacRoute pageKey="import"><ImportPage /></RbacRoute>} />
         <Route path="/channels/:id" element={<RbacRoute pageKey="channels"><ChannelDetailPage /></RbacRoute>} />
+        <Route path="/micro-units" element={<RbacRoute pageKey="micro-units"><MicroUnitsPage /></RbacRoute>} />
         <Route path="/sync" element={<RbacRoute pageKey="sync"><SyncPage /></RbacRoute>} />
         <Route path="/reports" element={<RbacRoute pageKey="reports"><ReportsPage /></RbacRoute>} />
         <Route path="/ai-studio" element={<RbacRoute pageKey="ai-studio"><AIStudioPage /></RbacRoute>} />

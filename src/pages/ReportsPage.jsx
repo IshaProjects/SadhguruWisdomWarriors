@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, RefreshCw, Tv2, Video, Tag, CalendarRange,
+  ChevronsUpDown, RefreshCw, Tv2, Video, Tag, CalendarRange, Layers,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import { useCategories } from '../hooks/useCategories.js';
@@ -131,9 +131,10 @@ export default function ReportsPage() {
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-dark-700">
           {[
-            { id: 'channels',   label: 'Channel Report',  Icon: Tv2   },
-            { id: 'videos',     label: 'Video Report',    Icon: Video  },
-            { id: 'categories', label: 'Category Report', Icon: Tag    },
+            { id: 'channels',     label: 'Channel Report',    Icon: Tv2     },
+            { id: 'videos',       label: 'Video Report',      Icon: Video   },
+            { id: 'categories',  label: 'Category Report',   Icon: Tag     },
+            { id: 'micro-units', label: 'Micro Unit Report', Icon: Layers  },
           ].map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -150,9 +151,10 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {activeTab === 'channels'   && <ChannelReport   />}
-        {activeTab === 'videos'     && <VideoReport     />}
-        {activeTab === 'categories' && <CategoryReport  />}
+        {activeTab === 'channels'     && <ChannelReport    />}
+        {activeTab === 'videos'       && <VideoReport      />}
+        {activeTab === 'categories'   && <CategoryReport   />}
+        {activeTab === 'micro-units'  && <MicroUnitReport   />}
       </div>
     </div>
   );
@@ -166,7 +168,7 @@ function ChannelReport() {
   const monthRange = getCurrentMonthRange();
 
   const [filters, setFilters] = useState({
-    search: '', category: '', status: '', tags: '',
+    search: '', category: '', status: '', tags: '', classification: '',
     minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '',
     startDate: monthRange.startDate,
     endDate:   monthRange.endDate,
@@ -235,7 +237,7 @@ function ChannelReport() {
 
   const clearFilters = () => {
     const { startDate, endDate } = getCurrentMonthRange();
-    setFilters({ search: '', category: '', status: '', tags: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '', startDate, endDate });
+    setFilters({ search: '', category: '', status: '', tags: '', classification: '', minSubs: '', maxSubs: '', minViews: '', maxViews: '', country: '', startDate, endDate });
     setPage(1);
   };
 
@@ -378,6 +380,14 @@ function ChannelReport() {
             </select>
           </div>
           <div>
+            <label className="block text-xs text-dark-400 mb-1">Classification</label>
+            <select value={filters.classification} onChange={(e) => handleFilterChange('classification', e.target.value)} className="input-field text-sm w-full">
+              <option value="">All</option>
+              <option value="sadhguru">Has Sadhguru videos</option>
+              <option value="non_sadhguru">Has Non Sadhguru videos</option>
+            </select>
+          </div>
+          <div>
             <label className="block text-xs text-dark-400 mb-1">Country</label>
             <input type="text" placeholder="e.g. US, IN" value={filters.country} onChange={(e) => handleFilterChange('country', e.target.value)} className="input-field text-sm w-full" />
           </div>
@@ -438,6 +448,8 @@ function ChannelReport() {
                 <Th label="Channel"            col="title"              sort={sort} onSort={handleSort} />
                 <Th label="Category"           col="category"           sort={sort} onSort={handleSort} />
                 <Th label="Status"             col="status"             sort={sort} onSort={handleSort} />
+                <Th label="Sadhguru"           col="sadhguru_count"     sort={sort} onSort={handleSort} />
+                <Th label="Non Sadhguru"       col="non_sadhguru_count" sort={sort} onSort={handleSort} />
                 <Th label="Country"            col="country"            sort={sort} onSort={handleSort} />
                 <Th label="Subscribers"        col="subscribers"        sort={sort} onSort={handleSort} />
                 <Th label="Views in this time range" col={isPeriodMode ? 'views_in_period' : 'total_views'} sort={sort} onSort={handleSort} />
@@ -453,9 +465,9 @@ function ChannelReport() {
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={isPeriodMode ? 13 : 12} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={isPeriodMode ? 15 : 14} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={isPeriodMode ? 13 : 12} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
+                <tr><td colSpan={isPeriodMode ? 15 : 14} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_channel_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -468,6 +480,8 @@ function ChannelReport() {
                                                 'bg-dark-600 text-dark-400'
                     }`}>{r.status}</span>
                   </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-green-400">{fmt(r.sadhguru_count)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.non_sadhguru_count)}</td>
                   <td className="px-3 py-2.5 text-dark-300">{r.country || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.subscribers)}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-accent-300">
@@ -500,6 +514,7 @@ function CategoryReport() {
   // ── server-filter state (passed to the API) ───────────────────────────────
   const [statusFilter, setStatusFilter] = useState('');   // active | paused | archived | ''
   const [tagsFilter,   setTagsFilter]   = useState('');
+  const [classificationFilter, setClassificationFilter] = useState('');
   const [startDate,    setStartDate]    = useState(monthRange.startDate);
   const [endDate,      setEndDate]      = useState(monthRange.endDate);
 
@@ -524,14 +539,16 @@ function CategoryReport() {
   const [exporting,   setExporting]   = useState('');
 
   // ── fetch from server ─────────────────────────────────────────────────────
-  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, sd = startDate, ed = endDate) => {
+  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, cf = classificationFilter, sd = startDate, ed = endDate, gf = groupFilter) => {
     setLoading(true);
     try {
       const params = {};
-      if (sf)  params.status    = sf;
-      if (tf)  params.tags      = tf;
-      if (sd)  params.startDate = sd;
-      if (ed)  params.endDate   = ed;
+      if (sf) params.status = sf;
+      if (tf) params.tags = tf;
+      if (cf) params.classification = cf;
+      if (gf) params.group = gf;
+      if (sd) params.startDate = sd;
+      if (ed) params.endDate = ed;
       const res = await api.get('/dashboard/categories', { params });
       setRows(res.data);
     } catch {
@@ -539,7 +556,7 @@ function CategoryReport() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, tagsFilter, startDate, endDate]);
+  }, [statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -573,15 +590,16 @@ function CategoryReport() {
   const clearAllFilters = () => {
     setStatusFilter('');
     setTagsFilter('');
+    setClassificationFilter('');
     const { startDate: sd, endDate: ed } = getCurrentMonthRange();
     setStartDate(sd);
     setEndDate(ed);
     setGroupFilter('');
     clearChannel();
-    fetchData('', '', sd, ed);
+    fetchData('', '', '', sd, ed, '');
   };
 
-  const hasFilters = statusFilter || tagsFilter || selectedChannel || groupFilter || startDate || endDate;
+  const hasFilters = statusFilter || tagsFilter || classificationFilter || selectedChannel || groupFilter || startDate || endDate;
 
   // ── sort ──────────────────────────────────────────────────────────────────
   const handleSort = (col) => {
@@ -699,7 +717,7 @@ function CategoryReport() {
               type="date"
               value={startDate}
               max={endDate || undefined}
-              onChange={(e) => { setStartDate(e.target.value); fetchData(statusFilter, tagsFilter, e.target.value, endDate); }}
+              onChange={(e) => { const v = e.target.value; setStartDate(v); fetchData(statusFilter, tagsFilter, classificationFilter, v, endDate, groupFilter); }}
               className="input-field text-sm w-36"
               title="From"
             />
@@ -708,7 +726,7 @@ function CategoryReport() {
               type="date"
               value={endDate}
               min={startDate || undefined}
-              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, startDate, e.target.value); }}
+              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, e.target.value, groupFilter); }}
               className="input-field text-sm w-36"
               title="To"
             />
@@ -718,7 +736,7 @@ function CategoryReport() {
                   const { startDate: sd, endDate: ed } = getCurrentMonthRange();
                   setStartDate(sd);
                   setEndDate(ed);
-                  fetchData(statusFilter, tagsFilter, sd, ed);
+                  fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
                 }}
                 className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
                 title="Reset to current month"
@@ -799,7 +817,7 @@ function CategoryReport() {
           <div>
             <label className="block text-xs text-dark-400 mb-1">Channel Status</label>
             <select value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter, startDate, endDate); }}
+              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter, classificationFilter, startDate, endDate, groupFilter); }}
               className="input-field text-sm w-full">
               <option value="">All (excl. archived)</option>
               <option value="active">Active</option>
@@ -813,8 +831,20 @@ function CategoryReport() {
             <label className="block text-xs text-dark-400 mb-1">Tags</label>
             <input type="text" placeholder="comma-separated" value={tagsFilter}
               onChange={(e) => setTagsFilter(e.target.value)}
-              onBlur={() => fetchData(statusFilter, tagsFilter, startDate, endDate)}
+              onBlur={() => fetchData(statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter)}
               className="input-field text-sm w-full" />
+          </div>
+
+          {/* Classification filter */}
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Classification</label>
+            <select value={classificationFilter}
+              onChange={(e) => { setClassificationFilter(e.target.value); fetchData(statusFilter, tagsFilter, e.target.value, startDate, endDate, groupFilter); }}
+              className="input-field text-sm w-full">
+              <option value="">All channels</option>
+              <option value="sadhguru">Has Sadhguru videos</option>
+              <option value="non_sadhguru">Has Non Sadhguru videos</option>
+            </select>
           </div>
 
           {/* Group quick-filter */}
@@ -829,7 +859,7 @@ function CategoryReport() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setGroupFilter(value)}
+                  onClick={() => { setGroupFilter(value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, endDate, value); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     groupFilter === value
                       ? 'bg-accent-500/20 border-accent-500/40 text-accent-300'
@@ -964,13 +994,386 @@ function CategoryReport() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Micro Unit Report Tab
+═══════════════════════════════════════════════════════════════════ */
+function MicroUnitReport() {
+  const monthRange = getCurrentMonthRange();
+  const [statusFilter, setStatusFilter] = useState('');
+  const [tagsFilter, setTagsFilter] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState('');
+  const [startDate, setStartDate] = useState(monthRange.startDate);
+  const [endDate, setEndDate] = useState(monthRange.endDate);
+  const [groupFilter, setGroupFilter] = useState('');
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [sort, setSort] = useState('totalViews');
+  const [sortDir, setSortDir] = useState('desc');
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState('');
+
+  const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, cf = classificationFilter, sd = startDate, ed = endDate, gf = groupFilter) => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (sf) params.status = sf;
+      if (tf) params.tags = tf;
+      if (cf) params.classification = cf;
+      if (sd) params.startDate = sd;
+      if (ed) params.endDate = ed;
+      if (gf) params.group = gf;
+      const res = await api.get('/dashboard/micro-units-report', { params });
+      setRows(res.data);
+    } catch {
+      toast.error('Failed to load micro unit report');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const clearAllFilters = () => {
+    setStatusFilter('');
+    setTagsFilter('');
+    setClassificationFilter('');
+    const { startDate: sd, endDate: ed } = getCurrentMonthRange();
+    setStartDate(sd);
+    setEndDate(ed);
+    setGroupFilter('');
+    setSearch('');
+    fetchData('', '', '', sd, ed, '');
+  };
+
+  const hasFilters = statusFilter || tagsFilter || classificationFilter || groupFilter || startDate || endDate;
+
+  const handleSort = (col) => {
+    if (sort === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSort(col); setSortDir('desc'); }
+  };
+
+  const displayed = [...rows]
+    .filter((r) => !search.trim() || (r.name || '').toLowerCase().includes(search.toLowerCase()))
+    .map((r) => ({
+      ...r,
+      avgViews: r.count ? Math.round(r.totalViews / r.count) : 0,
+      viewsPerSub: r.totalSubs ? r.totalViews / r.totalSubs : 0,
+    }))
+    .sort((a, b) => {
+      const av = a[sort] ?? 0;
+      const bv = b[sort] ?? 0;
+      const cmp = typeof av === 'string' ? (av || '').localeCompare(bv || '') : av - bv;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+  const totals = displayed.reduce(
+    (acc, r) => ({ channels: acc.channels + r.count, subs: acc.subs + r.totalSubs, views: acc.views + r.totalViews }),
+    { channels: 0, subs: 0, views: 0 }
+  );
+  const overallViewsPerSub = totals.subs ? totals.views / totals.subs : 0;
+  const maxViews = Math.max(...displayed.map((r) => r.totalViews), 1);
+
+  const buildCsvContent = () => {
+    const totalViews = totals.views || 1;
+    const header = 'Micro Unit,Channels,Total Subscribers,Total Views,Avg Views/Channel,Views per Subscriber,% of Total Views\n';
+    const body = displayed.map((r) => {
+      const pct = ((r.totalViews / totalViews) * 100).toFixed(1);
+      return `"${r.name || ''}",${r.count},${r.totalSubs},${r.totalViews},${r.avgViews},${r.viewsPerSub.toFixed(3)},${pct}%`;
+    }).join('\n');
+    return header + body;
+  };
+
+  const downloadCsv = (filename) => {
+    const blob = new Blob([buildCsvContent()], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = () => {
+    setExporting('csv');
+    try { downloadCsv(`micro-unit-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported as CSV'); }
+    catch { toast.error('Export failed'); }
+    finally { setExporting(''); }
+  };
+
+  const handleExportExcel = () => {
+    setExporting('excel');
+    try { downloadCsv(`micro-unit-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported (CSV format)'); }
+    catch { toast.error('Export failed'); }
+    finally { setExporting(''); }
+  };
+
+  function MuSortIcon({ col }) {
+    if (sort !== col) return <ChevronsUpDown className="w-3 h-3 opacity-30" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="w-3 h-3 text-accent-400" />
+      : <ChevronDown className="w-3 h-3 text-accent-400" />;
+  }
+
+  function MuTh({ label, col, title }) {
+    return (
+      <th
+        title={title}
+        className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide whitespace-nowrap cursor-pointer select-none hover:text-dark-200 transition-colors"
+        onClick={() => handleSort(col)}
+      >
+        <span className="flex items-center gap-1">{label}<MuSortIcon col={col} /></span>
+      </th>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 justify-between">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+          <div className="relative min-w-48 max-w-xs flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+            <input
+              type="text"
+              placeholder="Filter micro units…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field pl-9 w-full text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(e) => { const v = e.target.value; setStartDate(v); fetchData(statusFilter, tagsFilter, classificationFilter, v, endDate, groupFilter); }}
+              className="input-field text-sm w-36"
+              title="From"
+            />
+            <span className="text-dark-500 text-sm">→</span>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, e.target.value, groupFilter); }}
+              className="input-field text-sm w-36"
+              title="To"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  const { startDate: sd, endDate: ed } = getCurrentMonthRange();
+                  setStartDate(sd);
+                  setEndDate(ed);
+                  fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
+                }}
+                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
+                title="Reset to current month"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`btn-ghost flex items-center gap-2 text-sm ${showFilters ? 'text-accent-400' : ''}`}
+          >
+            <Filter className="w-4 h-4" /> Filters
+            {hasFilters && <span className="w-2 h-2 rounded-full bg-accent-500 ml-0.5" />}
+          </button>
+          {hasFilters && (
+            <button onClick={clearAllFilters} className="btn-ghost text-xs text-dark-400 flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+          <button onClick={() => fetchData()} className="btn-ghost p-2" title="Refresh">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button onClick={handleExportCsv} disabled={!!exporting}
+            className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileText className="w-4 h-4" />
+            {exporting === 'csv' ? 'Exporting…' : 'CSV'}
+          </button>
+          <button onClick={handleExportExcel} disabled={!!exporting}
+            className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
+            <FileSpreadsheet className="w-4 h-4" />
+            {exporting === 'excel' ? 'Exporting…' : 'Excel'}
+          </button>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="glass-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Channel Status</label>
+            <select value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); fetchData(e.target.value, tagsFilter, classificationFilter, startDate, endDate, groupFilter); }}
+              className="input-field text-sm w-full">
+              <option value="">All (excl. archived)</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Tags</label>
+            <input type="text" placeholder="comma-separated" value={tagsFilter}
+              onChange={(e) => setTagsFilter(e.target.value)}
+              onBlur={() => fetchData(statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter)}
+              className="input-field text-sm w-full" />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Classification</label>
+            <select value={classificationFilter}
+              onChange={(e) => { setClassificationFilter(e.target.value); fetchData(statusFilter, tagsFilter, e.target.value, startDate, endDate, groupFilter); }}
+              className="input-field text-sm w-full">
+              <option value="">All channels</option>
+              <option value="sadhguru">Has Sadhguru videos</option>
+              <option value="non_sadhguru">Has Non Sadhguru videos</option>
+            </select>
+          </div>
+          <div className="sm:col-span-3">
+            <label className="block text-xs text-dark-400 mb-2">Category Group</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: '', label: 'All Categories' },
+                { value: 'dedicated', label: 'Dedicated (starts with "Dedicated")' },
+                { value: 'ihi', label: 'IHI (contains "IHI")' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setGroupFilter(value); fetchData(statusFilter, tagsFilter, startDate, endDate, value); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    groupFilter === value
+                      ? 'bg-accent-500/20 border-accent-500/40 text-accent-300'
+                      : 'bg-dark-800 border-dark-600 text-dark-400 hover:text-dark-200 hover:border-dark-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && displayed.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[
+            { label: 'Views in this time range', value: fmt(totals.views) },
+            { label: 'Micro Units', value: displayed.length.toLocaleString() },
+            { label: 'Total Channels', value: fmt(totals.channels) },
+            { label: 'Total Subscribers', value: fmt(totals.subs) },
+            { label: 'Overall Views / Sub', value: overallViewsPerSub.toFixed(2) },
+          ].map(({ label, value }, idx) => (
+            <div key={label} className="glass-card px-4 py-3">
+              <p className="text-xs text-dark-400 mb-1">{label}</p>
+              <p className={`text-lg font-semibold font-mono ${idx === 0 ? 'text-accent-400' : ''}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-dark-800/60">
+              <tr>
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide w-8">#</th>
+                <MuTh label="Micro Unit" col="name" />
+                <MuTh label="Channels" col="count" />
+                <MuTh label="Total Subscribers" col="totalSubs" />
+                <MuTh label="Views in this time range" col="totalViews" />
+                <MuTh label="Avg Views / Channel" col="avgViews" />
+                <MuTh label="Views / Subscriber" col="viewsPerSub" title="Avg micro unit views ÷ total subscribers" />
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide min-w-[160px]">Share of Views</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-700/50">
+              {loading ? (
+                <tr><td colSpan={8} className="text-center py-12 text-dark-400">Loading…</td></tr>
+              ) : displayed.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-12 text-dark-400">No micro units found.</td></tr>
+              ) : displayed.map((r, i) => {
+                const sharePct = totals.views ? (r.totalViews / totals.views) * 100 : 0;
+                const barW = (r.totalViews / maxViews) * 100;
+                const vpsBadge =
+                  r.viewsPerSub >= overallViewsPerSub * 1.5 ? 'text-green-400' :
+                  r.viewsPerSub >= overallViewsPerSub ? 'text-emerald-400' :
+                  r.viewsPerSub >= overallViewsPerSub * 0.5 ? 'text-dark-300' : 'text-yellow-400';
+                return (
+                  <tr key={r.name || i} className="hover:bg-dark-800/40 transition-colors">
+                    <td className="px-3 py-2.5 text-dark-500 text-xs">{i + 1}</td>
+                    <td className="px-3 py-2.5 font-medium">{r.name || '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{fmt(r.count)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{fmt(r.totalSubs)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.totalViews)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.avgViews)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">
+                      <span className={`font-semibold ${vpsBadge}`}>
+                        {r.viewsPerSub >= 1000 ? `${(r.viewsPerSub / 1000).toFixed(1)}k` : r.viewsPerSub.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-dark-700 rounded-full h-2 overflow-hidden">
+                          <div className="h-2 rounded-full bg-accent-500 transition-all duration-500" style={{ width: `${barW}%` }} />
+                        </div>
+                        <span className="text-xs text-dark-400 w-10 text-right shrink-0">{sharePct.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {!loading && displayed.length > 0 && (
+              <tfoot className="border-t-2 border-dark-600 bg-dark-800/40">
+                <tr>
+                  <td className="px-3 py-2.5" />
+                  <td className="px-3 py-2.5 text-xs font-semibold text-dark-300">TOTAL</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.channels)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.subs)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-accent-300">{fmt(totals.views)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">
+                    {fmt(totals.channels ? Math.round(totals.views / totals.channels) : 0)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{overallViewsPerSub.toFixed(2)}</td>
+                  <td className="px-3 py-2.5 text-xs text-dark-400 text-right">100%</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {!loading && displayed.length > 0 && (
+        <p className="text-xs text-dark-500">
+          <span className="text-green-400 font-medium">Green</span> = 1.5× above average ·{' '}
+          <span className="text-emerald-400 font-medium">Teal</span> = above average ·{' '}
+          <span className="text-dark-300 font-medium">Grey</span> = average ·{' '}
+          <span className="text-yellow-400 font-medium">Yellow</span> = below average ·
+          {' '}Overall avg: <span className="font-mono">{overallViewsPerSub.toFixed(2)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Video Report Tab
 ═══════════════════════════════════════════════════════════════════ */
 function VideoReport() {
   const { categories } = useCategories();
 
   const [filters, setFilters] = useState({
-    search: '', category: '', status: '', tags: '',
+    search: '', category: '', status: '', tags: '', classification: '',
     minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '',
   });
   const [showFilters, setShowFilters] = useState(true);
@@ -1051,7 +1454,7 @@ function VideoReport() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', category: '', status: '', tags: '', minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '' });
+    setFilters({ search: '', category: '', status: '', tags: '', classification: '', minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '' });
     setSelectedChannel(null);
     setChannelSearch('');
     setPage(1);
@@ -1190,6 +1593,15 @@ function VideoReport() {
           </div>
 
           <div>
+            <label className="block text-xs text-dark-400 mb-1">Classification</label>
+            <select value={filters.classification} onChange={(e) => handleFilterChange('classification', e.target.value)} className="input-field text-sm w-full">
+              <option value="">All</option>
+              <option value="sadhguru">Sadhguru</option>
+              <option value="non_sadhguru">Non Sadhguru</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-xs text-dark-400 mb-1">Tags</label>
             <input type="text" placeholder="comma-separated" value={filters.tags} onChange={(e) => handleFilterChange('tags', e.target.value)} className="input-field text-sm w-full" />
           </div>
@@ -1227,6 +1639,7 @@ function VideoReport() {
                 <Th label="Title"           col="title"          sort={sort} onSort={handleSort} />
                 <Th label="Channel"         col="channel"        sort={sort} onSort={handleSort} />
                 <Th label="Category"        col="category"       sort={sort} onSort={handleSort} />
+                <Th label="Classification"  col="classification" sort={sort} onSort={handleSort} />
                 <Th label="Published"       col="published_at"   sort={sort} onSort={handleSort} />
                 <Th label="Views"           col="views"          sort={sort} onSort={handleSort} />
                 <Th label="Likes"           col="likes"          sort={sort} onSort={handleSort} />
@@ -1239,15 +1652,24 @@ function VideoReport() {
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={12} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={13} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={12} className="text-center py-12 text-dark-400">No videos match the current filters.</td></tr>
+                <tr><td colSpan={13} className="text-center py-12 text-dark-400">No videos match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_video_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
                   <td className="px-3 py-2.5 font-medium max-w-[260px] truncate" title={r.title}>{r.title}</td>
                   <td className="px-3 py-2.5 text-dark-300 max-w-[160px] truncate" title={r.channel}>{r.channel || '—'}</td>
                   <td className="px-3 py-2.5 text-dark-300">{r.category || '—'}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`badge text-xs ${
+                      r.classification === 'sadhguru' ? 'bg-green-500/20 text-green-400' :
+                      r.classification === 'non sadhguru' ? 'bg-dark-600 text-dark-300' :
+                      'bg-dark-700 text-dark-500'
+                    }`}>
+                      {r.classification || '—'}
+                    </span>
+                  </td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs">{r.published_at || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.views)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.likes)}</td>
