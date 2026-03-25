@@ -1702,7 +1702,7 @@ function VideoReport() {
           <table className="w-full text-sm">
             <thead className="bg-dark-800/60">
               <tr>
-                <Th label="#"               col="_idx"           sort={sort} onSort={handleSort} />
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide w-8">#</th>
                 <Th label="Title"           col="title"          sort={sort} onSort={handleSort} />
                 <Th label="Channel"         col="channel"        sort={sort} onSort={handleSort} />
                 <Th label="Category"        col="category"       sort={sort} onSort={handleSort} />
