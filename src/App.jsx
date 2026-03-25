@@ -14,6 +14,7 @@ import RbacConfigPage from './pages/RbacConfigPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import AIStudioPage from './pages/AIStudioPage.jsx';
 import MicroUnitsPage from './pages/MicroUnitsPage.jsx';
+import CredenceHomePage from './pages/CredenceHomePage.jsx';
 import LoadingSpinner from './components/common/LoadingSpinner.jsx';
 
 function ProtectedRoute({ children }) {
@@ -63,6 +64,14 @@ export default function App() {
           <PublicRoute>
             <RegisterPage />
           </PublicRoute>
+        }
+      />
+      <Route
+        path="/credence"
+        element={
+          <ProtectedRoute>
+            <CredenceHomePage />
+          </ProtectedRoute>
         }
       />
 

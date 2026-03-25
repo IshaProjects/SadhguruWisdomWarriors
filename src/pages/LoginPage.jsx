@@ -29,7 +29,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Youtube className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold">YT Channel Manager</h1>
+          <h1 className="text-2xl font-bold">Wisdom Warriors</h1>
           <p className="text-dark-400 text-sm mt-1">Sign in to your account</p>
         </div>
 

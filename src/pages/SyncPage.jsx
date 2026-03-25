@@ -12,6 +12,7 @@ import {
   Save,
   ToggleLeft,
   ToggleRight,
+  Sparkles,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
@@ -47,7 +48,14 @@ function duration(log) {
 
 // ── sub-components ──────────────────────────────────────────────────────────
 
-function SyncLogTable({ syncType, label, icon: Icon, triggerEndpoint, canTrigger }) {
+function SyncLogTable({
+  syncType,
+  label,
+  icon: Icon,
+  triggerEndpoint,
+  canTrigger,
+  showTrigger = true,
+}) {
   const [logs, setLogs]             = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [loading, setLoading]       = useState(true);
@@ -88,14 +96,14 @@ function SyncLogTable({ syncType, label, icon: Icon, triggerEndpoint, canTrigger
           <h3 className="font-semibold text-sm">{label} Sync History</h3>
           <span className="text-xs text-dark-400 ml-1">({pagination.total} runs)</span>
         </div>
-        {canTrigger && (
+        {showTrigger && canTrigger && (
           <button
             onClick={handleTrigger}
             disabled={triggering}
             className="btn-primary text-xs flex items-center gap-1.5 py-1.5"
           >
             <Play className={clsx('w-3.5 h-3.5', triggering && 'animate-pulse')} />
-            {triggering ? 'Starting…' : `Sync ${label} Now`}
+            {triggering ? 'Starting…' : `Run ${label}`}
           </button>
         )}
       </div>
@@ -113,7 +121,9 @@ function SyncLogTable({ syncType, label, icon: Icon, triggerEndpoint, canTrigger
                   {syncType === 'channel' ? (
                     <th className="text-right py-2 px-2 text-dark-400 font-medium">Channels</th>
                   ) : (
-                    <th className="text-right py-2 px-2 text-dark-400 font-medium">Videos</th>
+                    <th className="text-right py-2 px-2 text-dark-400 font-medium">
+                      Videos
+                    </th>
                   )}
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Quota</th>
                   <th className="text-right py-2 px-2 text-dark-400 font-medium">Errors</th>
@@ -177,6 +187,76 @@ function SyncLogTable({ syncType, label, icon: Icon, triggerEndpoint, canTrigger
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function BatchJobCard({
+  icon: Icon,
+  title,
+  description,
+  scheduleExpr,
+  scheduleEnabled,
+  isRunning,
+  canTrigger,
+  onRun,
+}) {
+  const [busy, setBusy] = useState(false);
+
+  const handleRun = async () => {
+    setBusy(true);
+    try {
+      await onRun();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const scheduleLabel =
+    scheduleExpr != null ? describeCron(scheduleExpr) : null;
+
+  return (
+    <div className="rounded-xl border border-dark-700/80 bg-dark-800/30 p-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex gap-3 min-w-0">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-dark-700/60">
+          <Icon className="w-5 h-5 text-accent-400" />
+        </div>
+        <div className="min-w-0">
+          <h4 className="font-semibold text-sm text-dark-100">{title}</h4>
+          <p className="text-xs text-dark-400 mt-1 leading-relaxed">{description}</p>
+          {scheduleExpr != null && (
+            <p className="text-xs mt-2 text-dark-500">
+              <span className="text-dark-500">Schedule: </span>
+              <span className="text-dark-300">{scheduleLabel}</span>
+              <span className="font-mono text-dark-400 ml-1">({scheduleExpr})</span>
+              {scheduleEnabled === false && (
+                <span className="ml-2 text-amber-400/90 font-medium">Off</span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0 sm:min-w-[7.5rem]">
+        <span
+          className={clsx(
+            'text-xs font-medium px-2.5 py-1 rounded-full text-center self-end',
+            isRunning ? 'bg-accent-500/20 text-accent-300' : 'bg-dark-700 text-dark-300'
+          )}
+        >
+          {isRunning ? 'Running…' : 'Idle'}
+        </span>
+        {canTrigger && (
+          <button
+            type="button"
+            onClick={handleRun}
+            disabled={isRunning || busy}
+            className="btn-primary text-xs flex items-center justify-center gap-1.5 py-2 px-3 disabled:opacity-50"
+          >
+            <Play className={clsx('w-3.5 h-3.5', (busy || isRunning) && 'animate-pulse')} />
+            {busy ? 'Starting…' : 'Run now'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -296,6 +376,17 @@ function ScheduleField({ label, value, onChange }) {
   );
 }
 
+const DEFAULT_SYNC_CONFIG = {
+  channelSyncSchedule: '0 3 * * *',
+  videoSyncSchedule: '0 4 * * *',
+  ihiIngestSchedule: '0 */6 * * *',
+  ihiSadhguruStatsSchedule: '0 5 * * *',
+  channelSyncEnabled: true,
+  videoSyncEnabled: true,
+  ihiIngestEnabled: true,
+  ihiSadhguruStatsEnabled: true,
+};
+
 // ── main page ────────────────────────────────────────────────────────────────
 
 export default function SyncPage() {
@@ -303,6 +394,8 @@ export default function SyncPage() {
 
   const canTriggerChannel = canPerformAction('sync.triggerChannel');
   const canTriggerVideo   = canPerformAction('sync.triggerVideo');
+  const canTriggerIhiIngest = canPerformAction('sync.triggerIhiIngest');
+  const canTriggerIhiSadhguruStats = canPerformAction('sync.triggerIhiSadhguruStats');
   const canConfigure      = canPerformAction('sync.configure');
 
   const [status,  setStatus]  = useState(null);
@@ -316,8 +409,9 @@ export default function SyncPage() {
       const res = await api.get('/sync/status');
       setStatus(res.data);
       if (!config) {
-        setConfig(res.data.config);
-        setDraft(res.data.config);
+        const merged = { ...DEFAULT_SYNC_CONFIG, ...res.data.config };
+        setConfig(merged);
+        setDraft(merged);
       }
     } catch {
       toast.error('Failed to load sync status');
@@ -348,6 +442,43 @@ export default function SyncPage() {
 
   const configDirty = JSON.stringify(draft) !== JSON.stringify(config);
 
+  const runChannelSync = async () => {
+    try {
+      await api.post('/sync/channels/trigger');
+      toast.success('Channel sync started');
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start channel sync');
+    }
+  };
+  const runDedicatedVideoSync = async () => {
+    try {
+      await api.post('/sync/videos/trigger');
+      toast.success('Dedicated video sync started');
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start dedicated video sync');
+    }
+  };
+  const runIhiIngest = async () => {
+    try {
+      await api.post('/sync/ihi/ingest/trigger');
+      toast.success('IHI ingest started');
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start IHI ingest');
+    }
+  };
+  const runIhiSadhguruStats = async () => {
+    try {
+      await api.post('/sync/ihi/sadhguru-stats/trigger');
+      toast.success('IHI Sadhguru stats sync started');
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start IHI Sadhguru stats');
+    }
+  };
+
   if (loading) return <LoadingSpinner size="lg" />;
 
   const quotaPercent = status?.quota
@@ -359,63 +490,83 @@ export default function SyncPage() {
       <TopBar title="Sync Status" />
       <div className="p-6 space-y-6">
 
-        {/* ── Status Cards ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Channel sync */}
-          <div className="glass-card p-5 flex items-center gap-4">
-            <div className={clsx(
-              'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-              status?.isChannelSyncing ? 'bg-accent-500/20' : 'bg-green-500/10'
-            )}>
-              <Database className={clsx('w-5 h-5', status?.isChannelSyncing ? 'text-accent-400' : 'text-green-400')} />
-            </div>
-            <div>
-              <p className="text-xs text-dark-400">Channel Sync</p>
-              <p className={clsx('text-sm font-semibold', status?.isChannelSyncing ? 'text-accent-400' : 'text-green-400')}>
-                {status?.isChannelSyncing ? 'Running…' : 'Idle'}
-              </p>
-            </div>
-          </div>
+        <p className="text-sm text-dark-400 max-w-3xl leading-relaxed">
+          Four separate batch jobs run on their own schedules. Use <span className="text-dark-300">Run now</span> to
+          trigger one manually. Dedicated video sync applies only to channels whose category starts with
+          &quot;Dedicated&quot;. IHI jobs apply to channels whose category contains &quot;IHI&quot; (and not Dedicated).
+        </p>
 
-          {/* Video sync */}
-          <div className="glass-card p-5 flex items-center gap-4">
-            <div className={clsx(
-              'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
-              status?.isVideoSyncing ? 'bg-accent-500/20' : 'bg-blue-500/10'
-            )}>
-              <Video className={clsx('w-5 h-5', status?.isVideoSyncing ? 'text-accent-400' : 'text-blue-400')} />
-            </div>
-            <div>
-              <p className="text-xs text-dark-400">Video Sync</p>
-              <p className={clsx('text-sm font-semibold', status?.isVideoSyncing ? 'text-accent-400' : 'text-blue-400')}>
-                {status?.isVideoSyncing ? 'Running…' : 'Idle'}
-              </p>
-            </div>
+        {/* ── Manual batch jobs (status + triggers) ───────────────── */}
+        <div className="glass-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Play className="w-4 h-4 text-accent-400" />
+            <h3 className="font-semibold text-sm">Batch jobs &amp; manual triggers</h3>
           </div>
+          <div className="grid grid-cols-1 gap-4">
+            <BatchJobCard
+              icon={Database}
+              title="Channel sync"
+              description="Fetches channel metadata and stats from YouTube, updates channel records and daily channel snapshots."
+              scheduleExpr={draft?.channelSyncSchedule}
+              scheduleEnabled={draft?.channelSyncEnabled}
+              isRunning={!!status?.isChannelSyncing}
+              canTrigger={canTriggerChannel}
+              onRun={runChannelSync}
+            />
+            <BatchJobCard
+              icon={Video}
+              title="Dedicated video sync"
+              description="For Dedicated channels only: refreshes the 10 most recent uploads per channel (details + stats + snapshots)."
+              scheduleExpr={draft?.videoSyncSchedule}
+              scheduleEnabled={draft?.videoSyncEnabled}
+              isRunning={!!status?.isVideoSyncing}
+              canTrigger={canTriggerVideo}
+              onRun={runDedicatedVideoSync}
+            />
+            <BatchJobCard
+              icon={Sparkles}
+              title="IHI ingest"
+              description="For IHI channels: loads uploads from the last 24 hours, then classifies new videos with Vertex (title + description)."
+              scheduleExpr={draft?.ihiIngestSchedule}
+              scheduleEnabled={draft?.ihiIngestEnabled}
+              isRunning={!!status?.isIhiIngestSyncing}
+              canTrigger={canTriggerIhiIngest}
+              onRun={runIhiIngest}
+            />
+            <BatchJobCard
+              icon={BarChart2}
+              title="IHI Sadhguru stats"
+              description="For IHI channels only: updates view counts and daily snapshots for videos classified as Sadhguru (for reporting)."
+              scheduleExpr={draft?.ihiSadhguruStatsSchedule}
+              scheduleEnabled={draft?.ihiSadhguruStatsEnabled}
+              isRunning={!!status?.isIhiSadhguruStatsSyncing}
+              canTrigger={canTriggerIhiSadhguruStats}
+              onRun={runIhiSadhguruStats}
+            />
+          </div>
+        </div>
 
-          {/* API Quota */}
-          <div className="glass-card p-5 col-span-1 md:col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-dark-400 flex items-center gap-1">
-                <BarChart2 className="w-3.5 h-3.5" /> YouTube API Quota
-              </p>
-              <p className="text-xs font-medium">
-                {formatNumber(status?.quota?.used ?? 0)} / {formatNumber(status?.quota?.limit ?? 10000)}
-              </p>
-            </div>
-            <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
-              <div
-                className={clsx(
-                  'h-full rounded-full transition-all duration-500',
-                  quotaPercent < 70 ? 'bg-green-500'
-                  : quotaPercent < 90 ? 'bg-yellow-500'
-                  : 'bg-red-500'
-                )}
-                style={{ width: `${quotaPercent}%` }}
-              />
-            </div>
-            <p className="text-xs text-dark-500 mt-1 text-right">{quotaPercent.toFixed(1)}% used today</p>
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-dark-400 flex items-center gap-1">
+              <BarChart2 className="w-3.5 h-3.5" /> YouTube API Quota
+            </p>
+            <p className="text-xs font-medium">
+              {formatNumber(status?.quota?.used ?? 0)} / {formatNumber(status?.quota?.limit ?? 10000)}
+            </p>
           </div>
+          <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
+            <div
+              className={clsx(
+                'h-full rounded-full transition-all duration-500',
+                quotaPercent < 70 ? 'bg-green-500'
+                : quotaPercent < 90 ? 'bg-yellow-500'
+                : 'bg-red-500'
+              )}
+              style={{ width: `${quotaPercent}%` }}
+            />
+          </div>
+          <p className="text-xs text-dark-500 mt-1 text-right">{quotaPercent.toFixed(1)}% used today</p>
         </div>
 
         {/* ── Schedule Config ───────────────────────────────────────── */}
@@ -487,7 +638,7 @@ export default function SyncPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Video className="w-4 h-4 text-dark-400" />
-                    <span className="text-sm font-medium">Video Sync</span>
+                    <span className="text-sm font-medium">Dedicated Video</span>
                   </div>
                   {canConfigure ? (
                     <button
@@ -521,30 +672,135 @@ export default function SyncPage() {
                   </div>
                 )}
               </div>
+
+              {/* IHI ingest */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-dark-400" />
+                    <span className="text-sm font-medium">IHI Ingest</span>
+                  </div>
+                  {canConfigure ? (
+                    <button
+                      onClick={() => setDraft((d) => ({ ...d, ihiIngestEnabled: !d.ihiIngestEnabled }))}
+                      className="flex items-center gap-1.5 text-xs"
+                    >
+                      {draft.ihiIngestEnabled
+                        ? <ToggleRight className="w-5 h-5 text-green-400" />
+                        : <ToggleLeft  className="w-5 h-5 text-dark-500"  />}
+                      <span className={draft.ihiIngestEnabled ? 'text-green-400' : 'text-dark-500'}>
+                        {draft.ihiIngestEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className={clsx('text-xs', draft.ihiIngestEnabled ? 'text-green-400' : 'text-dark-500')}>
+                      {draft.ihiIngestEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  )}
+                </div>
+                {canConfigure ? (
+                  <ScheduleField
+                    label="Cron (24h window + classify)"
+                    value={draft.ihiIngestSchedule}
+                    onChange={(v) => setDraft((d) => ({ ...d, ihiIngestSchedule: v }))}
+                  />
+                ) : (
+                  <div>
+                    <p className="text-xs text-dark-400 mb-1">Cron expression</p>
+                    <p className="text-sm font-mono text-dark-300">{draft.ihiIngestSchedule}</p>
+                    <p className="text-xs text-dark-500 mt-0.5">{describeCron(draft.ihiIngestSchedule)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* IHI Sadhguru stats */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4 text-dark-400" />
+                    <span className="text-sm font-medium">IHI Sadhguru Stats</span>
+                  </div>
+                  {canConfigure ? (
+                    <button
+                      onClick={() => setDraft((d) => ({ ...d, ihiSadhguruStatsEnabled: !d.ihiSadhguruStatsEnabled }))}
+                      className="flex items-center gap-1.5 text-xs"
+                    >
+                      {draft.ihiSadhguruStatsEnabled
+                        ? <ToggleRight className="w-5 h-5 text-green-400" />
+                        : <ToggleLeft  className="w-5 h-5 text-dark-500"  />}
+                      <span className={draft.ihiSadhguruStatsEnabled ? 'text-green-400' : 'text-dark-500'}>
+                        {draft.ihiSadhguruStatsEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className={clsx('text-xs', draft.ihiSadhguruStatsEnabled ? 'text-green-400' : 'text-dark-500')}>
+                      {draft.ihiSadhguruStatsEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  )}
+                </div>
+                {canConfigure ? (
+                  <ScheduleField
+                    label="Cron (Sadhguru videos only)"
+                    value={draft.ihiSadhguruStatsSchedule}
+                    onChange={(v) => setDraft((d) => ({ ...d, ihiSadhguruStatsSchedule: v }))}
+                  />
+                ) : (
+                  <div>
+                    <p className="text-xs text-dark-400 mb-1">Cron expression</p>
+                    <p className="text-sm font-mono text-dark-300">{draft.ihiSadhguruStatsSchedule}</p>
+                    <p className="text-xs text-dark-500 mt-0.5">{describeCron(draft.ihiSadhguruStatsSchedule)}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           <p className="text-xs text-dark-500">
             Cron format: <span className="font-mono">minute hour day-of-month month day-of-week</span>.
-            Changes take effect immediately without restarting the server.
+            Changes apply immediately (no server restart).
           </p>
         </div>
 
-        {/* ── Separate Sync History Tables ─────────────────────────── */}
+        {/* ── Run history (use manual triggers above) ──────────────── */}
+        <div className="flex items-center gap-2 pt-2">
+          <RefreshCw className="w-4 h-4 text-dark-500" />
+          <h3 className="text-sm font-semibold text-dark-300">Run history</h3>
+        </div>
+
         <SyncLogTable
           syncType="channel"
           label="Channel"
           icon={Database}
           triggerEndpoint="/sync/channels/trigger"
           canTrigger={canTriggerChannel}
+          showTrigger={false}
         />
 
         <SyncLogTable
           syncType="video"
-          label="Video"
+          label="Dedicated Video"
           icon={Video}
           triggerEndpoint="/sync/videos/trigger"
           canTrigger={canTriggerVideo}
+          showTrigger={false}
+        />
+
+        <SyncLogTable
+          syncType="ihi_ingest"
+          label="IHI Ingest"
+          icon={Sparkles}
+          triggerEndpoint="/sync/ihi/ingest/trigger"
+          canTrigger={canTriggerIhiIngest}
+          showTrigger={false}
+        />
+
+        <SyncLogTable
+          syncType="ihi_sadhguru_stats"
+          label="IHI Sadhguru Stats"
+          icon={BarChart2}
+          triggerEndpoint="/sync/ihi/sadhguru-stats/trigger"
+          canTrigger={canTriggerIhiSadhguruStats}
+          showTrigger={false}
         />
       </div>
     </div>

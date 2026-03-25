@@ -36,7 +36,7 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <Youtube className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="text-dark-400 text-sm mt-1">Get started with YT Manager</p>
+          <p className="text-dark-400 text-sm mt-1">Get started with Wisdom Warriors</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">

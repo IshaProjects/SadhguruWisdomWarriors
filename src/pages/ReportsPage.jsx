@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
   ChevronsUpDown, RefreshCw, Tv2, Video, Tag, CalendarRange, Layers,
@@ -191,7 +191,7 @@ function ChannelReport() {
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
       // map sort key back to mongo/row field name (period fields pass through as-is)
-      const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(s.replace(/^[-+]/, ''));
+      const isPeriodSort = ['views_in_period', 'subscribers_in_period', 'videos_in_period'].includes(s.replace(/^[-+]/, ''));
       params.sort = isPeriodSort ? s : s.replace('subscribers', 'currentStats.subscribers')
                                          .replace('total_views', 'currentStats.views')
                                          .replace('video_count', 'currentStats.videoCount');
@@ -214,7 +214,7 @@ function ChannelReport() {
   // Default sort to Views (Period) when date range selected; reset when leaving period mode
   useEffect(() => {
     const curKey = sort.replace(/^[-+]/, '');
-    const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(curKey);
+    const isPeriodSort = ['views_in_period', 'subscribers_in_period', 'videos_in_period'].includes(curKey);
     if (filters.startDate && filters.endDate) {
       if (!isPeriodSort) setSort('-views_in_period');
     } else if (isPeriodSort) {
@@ -273,6 +273,12 @@ function ChannelReport() {
 
   const hasFilters = Object.values(filters).some((v) => v !== '');
   const isPeriodMode = !!(filters.startDate && filters.endDate);
+
+  /** Safe number for summary cards (API may omit keys) */
+  const n = (v) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  };
 
   return (
     <div className="space-y-4">
@@ -414,26 +420,38 @@ function ChannelReport() {
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* Summary cards — period metrics use totals that match the sum of the period columns across all filtered channels */}
       {!loading && summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="glass-card p-4">
-            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Views in this time range</p>
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">
+              {isPeriodMode ? 'Views in this time range' : 'Total views (all channels)'}
+            </p>
             <p className="text-xl font-semibold text-accent-400">
-              {fmt(isPeriodMode ? summary.totalViewsInPeriod : summary.totalViews)}
+              {fmt(isPeriodMode ? n(summary.totalViewsInPeriod) : n(summary.totalViews))}
             </p>
           </div>
           <div className="glass-card p-4">
             <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Channels</p>
-            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalChannels)}</p>
+            <p className="text-xl font-semibold text-dark-100">
+              {fmt(n(pagination.total ?? summary.totalChannels))}
+            </p>
           </div>
           <div className="glass-card p-4">
-            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Subscribers</p>
-            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalSubscribers)}</p>
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">
+              {isPeriodMode ? 'Net subscriber change' : 'Total Subscribers'}
+            </p>
+            <p className="text-xl font-semibold text-dark-100">
+              {fmt(isPeriodMode ? n(summary.totalSubscribersInPeriod) : n(summary.totalSubscribers))}
+            </p>
           </div>
           <div className="glass-card p-4">
-            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Videos</p>
-            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalVideos)}</p>
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">
+              {isPeriodMode ? 'Net videos added (channel)' : 'Total Videos'}
+            </p>
+            <p className="text-xl font-semibold text-dark-100">
+              {fmt(isPeriodMode ? n(summary.totalVideosInPeriod) : n(summary.totalVideos))}
+            </p>
           </div>
         </div>
       )}
@@ -456,6 +474,9 @@ function ChannelReport() {
                 {isPeriodMode && (
                   <Th label="Subs (Period)"   col="subscribers_in_period" sort={sort} onSort={handleSort} />
                 )}
+                {isPeriodMode && (
+                  <Th label="Videos (Period)" col="videos_in_period" sort={sort} onSort={handleSort} />
+                )}
                 <Th label="Videos"             col="video_count"        sort={sort} onSort={handleSort} />
                 <Th label="Avg Views/Video"    col="avg_views_per_video" sort={sort} onSort={handleSort} />
                 <Th label="Tags"               col="tags"               sort={sort} onSort={handleSort} />
@@ -465,9 +486,9 @@ function ChannelReport() {
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={isPeriodMode ? 15 : 14} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={isPeriodMode ? 15 : 14} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
+                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_channel_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -489,6 +510,9 @@ function ChannelReport() {
                   </td>
                   {isPeriodMode && (
                     <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.subscribers_in_period)}</td>
+                  )}
+                  {isPeriodMode && (
+                    <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.videos_in_period)}</td>
                   )}
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.video_count)}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.avg_views_per_video)}</td>
@@ -1053,33 +1077,60 @@ function MicroUnitReport() {
     else { setSort(col); setSortDir('desc'); }
   };
 
-  const displayed = [...rows]
-    .filter((r) => !search.trim() || (r.name || '').toLowerCase().includes(search.toLowerCase()))
-    .map((r) => ({
-      ...r,
-      avgViews: r.count ? Math.round(r.totalViews / r.count) : 0,
-      viewsPerSub: r.totalSubs ? r.totalViews / r.totalSubs : 0,
-    }))
-    .sort((a, b) => {
+  const isPeriodMode = !!(startDate && endDate);
+
+  /** Full API rows (date + server filters); summary cards use this, not search-filtered rows */
+  const mappedRows = useMemo(
+    () => rows.map((r) => ({ ...r, totalVideos: r.totalVideos ?? 0 })),
+    [rows],
+  );
+
+  const totalsForSummary = useMemo(
+    () => mappedRows.reduce(
+      (acc, r) => ({
+        channels: acc.channels + r.count,
+        subs: acc.subs + r.totalSubs,
+        views: acc.views + r.totalViews,
+        videos: acc.videos + (r.totalVideos ?? 0),
+      }),
+      { channels: 0, subs: 0, views: 0, videos: 0 },
+    ),
+    [mappedRows],
+  );
+
+  const displayed = useMemo(() => {
+    const filtered = mappedRows.filter(
+      (r) => !search.trim() || (r.name || '').toLowerCase().includes(search.toLowerCase()),
+    );
+    return [...filtered].sort((a, b) => {
       const av = a[sort] ?? 0;
       const bv = b[sort] ?? 0;
       const cmp = typeof av === 'string' ? (av || '').localeCompare(bv || '') : av - bv;
       return sortDir === 'asc' ? cmp : -cmp;
     });
+  }, [mappedRows, search, sort, sortDir]);
 
-  const totals = displayed.reduce(
-    (acc, r) => ({ channels: acc.channels + r.count, subs: acc.subs + r.totalSubs, views: acc.views + r.totalViews }),
-    { channels: 0, subs: 0, views: 0 }
+  const totalsFooter = useMemo(
+    () => displayed.reduce(
+      (acc, r) => ({
+        channels: acc.channels + r.count,
+        subs: acc.subs + r.totalSubs,
+        views: acc.views + r.totalViews,
+        videos: acc.videos + (r.totalVideos ?? 0),
+      }),
+      { channels: 0, subs: 0, views: 0, videos: 0 },
+    ),
+    [displayed],
   );
-  const overallViewsPerSub = totals.subs ? totals.views / totals.subs : 0;
-  const maxViews = Math.max(...displayed.map((r) => r.totalViews), 1);
+
+  const maxViews = Math.max(...mappedRows.map((r) => r.totalViews), 1);
 
   const buildCsvContent = () => {
-    const totalViews = totals.views || 1;
-    const header = 'Micro Unit,Channels,Total Subscribers,Total Views,Avg Views/Channel,Views per Subscriber,% of Total Views\n';
-    const body = displayed.map((r) => {
+    const totalViews = totalsForSummary.views || 1;
+    const header = 'Micro Unit,Channels,Subscribers,Views,Videos,% of Total Views\n';
+    const body = mappedRows.map((r) => {
       const pct = ((r.totalViews / totalViews) * 100).toFixed(1);
-      return `"${r.name || ''}",${r.count},${r.totalSubs},${r.totalViews},${r.avgViews},${r.viewsPerSub.toFixed(3)},${pct}%`;
+      return `"${r.name || ''}",${r.count},${r.totalSubs},${r.totalViews},${r.totalVideos ?? 0},${pct}%`;
     }).join('\n');
     return header + body;
   };
@@ -1249,7 +1300,7 @@ function MicroUnitReport() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => { setGroupFilter(value); fetchData(statusFilter, tagsFilter, startDate, endDate, value); }}
+                  onClick={() => { setGroupFilter(value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, endDate, value); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     groupFilter === value
                       ? 'bg-accent-500/20 border-accent-500/40 text-accent-300'
@@ -1264,14 +1315,23 @@ function MicroUnitReport() {
         </div>
       )}
 
-      {!loading && displayed.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {!loading && mappedRows.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: 'Views in this time range', value: fmt(totals.views) },
-            { label: 'Micro Units', value: displayed.length.toLocaleString() },
-            { label: 'Total Channels', value: fmt(totals.channels) },
-            { label: 'Total Subscribers', value: fmt(totals.subs) },
-            { label: 'Overall Views / Sub', value: overallViewsPerSub.toFixed(2) },
+            {
+              label: isPeriodMode ? 'Views (in range)' : 'Views',
+              value: fmt(totalsForSummary.views),
+            },
+            {
+              label: isPeriodMode ? 'Subscriber change' : 'Subscribers',
+              value: fmt(totalsForSummary.subs),
+            },
+            {
+              label: isPeriodMode ? 'Videos (published in range)' : 'Videos',
+              value: fmt(totalsForSummary.videos),
+            },
+            { label: 'Micro Units', value: mappedRows.length.toLocaleString() },
+            { label: 'Channels', value: fmt(totalsForSummary.channels) },
           ].map(({ label, value }, idx) => (
             <div key={label} className="glass-card px-4 py-3">
               <p className="text-xs text-dark-400 mb-1">{label}</p>
@@ -1289,25 +1349,20 @@ function MicroUnitReport() {
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide w-8">#</th>
                 <MuTh label="Micro Unit" col="name" />
                 <MuTh label="Channels" col="count" />
-                <MuTh label="Total Subscribers" col="totalSubs" />
-                <MuTh label="Views in this time range" col="totalViews" />
-                <MuTh label="Avg Views / Channel" col="avgViews" />
-                <MuTh label="Views / Subscriber" col="viewsPerSub" title="Avg micro unit views ÷ total subscribers" />
+                <MuTh label={isPeriodMode ? 'Subscribers (Δ)' : 'Subscribers'} col="totalSubs" title={isPeriodMode ? 'Net subscriber change from channel snapshots in the selected range' : undefined} />
+                <MuTh label={isPeriodMode ? 'Views (in range)' : 'Views'} col="totalViews" />
+                <MuTh label={isPeriodMode ? 'Videos (in range)' : 'Videos'} col="totalVideos" title={isPeriodMode ? 'Videos published in the selected date range' : 'Total videos across channels'} />
                 <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide min-w-[160px]">Share of Views</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : displayed.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-dark-400">No micro units found.</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-dark-400">No micro units found.</td></tr>
               ) : displayed.map((r, i) => {
-                const sharePct = totals.views ? (r.totalViews / totals.views) * 100 : 0;
+                const sharePct = totalsForSummary.views ? (r.totalViews / totalsForSummary.views) * 100 : 0;
                 const barW = (r.totalViews / maxViews) * 100;
-                const vpsBadge =
-                  r.viewsPerSub >= overallViewsPerSub * 1.5 ? 'text-green-400' :
-                  r.viewsPerSub >= overallViewsPerSub ? 'text-emerald-400' :
-                  r.viewsPerSub >= overallViewsPerSub * 0.5 ? 'text-dark-300' : 'text-yellow-400';
                 return (
                   <tr key={r.name || i} className="hover:bg-dark-800/40 transition-colors">
                     <td className="px-3 py-2.5 text-dark-500 text-xs">{i + 1}</td>
@@ -1315,12 +1370,7 @@ function MicroUnitReport() {
                     <td className="px-3 py-2.5 text-right font-mono">{fmt(r.count)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{fmt(r.totalSubs)}</td>
                     <td className="px-3 py-2.5 text-right font-mono text-accent-300">{fmt(r.totalViews)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.avgViews)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono">
-                      <span className={`font-semibold ${vpsBadge}`}>
-                        {r.viewsPerSub >= 1000 ? `${(r.viewsPerSub / 1000).toFixed(1)}k` : r.viewsPerSub.toFixed(2)}
-                      </span>
-                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.totalVideos ?? 0)}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-dark-700 rounded-full h-2 overflow-hidden">
@@ -1337,31 +1387,24 @@ function MicroUnitReport() {
               <tfoot className="border-t-2 border-dark-600 bg-dark-800/40">
                 <tr>
                   <td className="px-3 py-2.5" />
-                  <td className="px-3 py-2.5 text-xs font-semibold text-dark-300">TOTAL</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.channels)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totals.subs)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-accent-300">{fmt(totals.views)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">
-                    {fmt(totals.channels ? Math.round(totals.views / totals.channels) : 0)}
+                  <td className="px-3 py-2.5 text-xs font-semibold text-dark-300">
+                    TOTAL{search.trim() ? ' (visible)' : ''}
                   </td>
-                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{overallViewsPerSub.toFixed(2)}</td>
-                  <td className="px-3 py-2.5 text-xs text-dark-400 text-right">100%</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totalsFooter.channels)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totalsFooter.subs)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-accent-300">{fmt(totalsFooter.views)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-semibold text-dark-200">{fmt(totalsFooter.videos)}</td>
+                  <td className="px-3 py-2.5 text-xs text-dark-400 text-right">
+                    {totalsForSummary.views
+                      ? `${((totalsFooter.views / totalsForSummary.views) * 100).toFixed(1)}%`
+                      : '—'}
+                  </td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
       </div>
-
-      {!loading && displayed.length > 0 && (
-        <p className="text-xs text-dark-500">
-          <span className="text-green-400 font-medium">Green</span> = 1.5× above average ·{' '}
-          <span className="text-emerald-400 font-medium">Teal</span> = above average ·{' '}
-          <span className="text-dark-300 font-medium">Grey</span> = average ·{' '}
-          <span className="text-yellow-400 font-medium">Yellow</span> = below average ·
-          {' '}Overall avg: <span className="font-mono">{overallViewsPerSub.toFixed(2)}</span>
-        </p>
-      )}
     </div>
   );
 }
@@ -1376,13 +1419,14 @@ function VideoReport() {
     search: '', category: '', status: '', tags: '', classification: '',
     minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '',
   });
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [sort,  setSort]  = useState('-views');
   const [page,  setPage]  = useState(1);
   const LIMIT = 50;
 
   const [rows,       setRows]       = useState([]);
   const [pagination, setPagination] = useState({ total: 0, pages: 0 });
+  const [summary,    setSummary]    = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [exporting,  setExporting]  = useState('');
 
@@ -1401,6 +1445,7 @@ function VideoReport() {
       const res = await api.get('/export/report/videos', { params });
       setRows(res.data.data);
       setPagination(res.data.pagination);
+      setSummary(res.data.summary ?? null);
     } catch {
       toast.error('Failed to load video report');
     } finally {
@@ -1625,6 +1670,28 @@ function VideoReport() {
           <div>
             <label className="block text-xs text-dark-400 mb-1">Max Views</label>
             <input type="number" min="0" value={filters.maxViews} onChange={(e) => handleFilterChange('maxViews', e.target.value)} className="input-field text-sm w-full" placeholder="∞" />
+          </div>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      {!loading && summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Videos (filtered)</p>
+            <p className="text-xl font-semibold text-accent-400">{fmt(summary.totalVideos)}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Views</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalViews)}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Likes</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalLikes)}</p>
+          </div>
+          <div className="glass-card p-4">
+            <p className="text-xs text-dark-500 uppercase tracking-wide mb-1">Total Comments</p>
+            <p className="text-xl font-semibold text-dark-100">{fmt(summary.totalComments)}</p>
           </div>
         </div>
       )}

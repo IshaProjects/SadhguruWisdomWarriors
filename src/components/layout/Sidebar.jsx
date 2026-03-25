@@ -43,7 +43,7 @@ export default function Sidebar() {
       <div className="flex items-center gap-3 px-4 h-16 border-b border-dark-700/50">
         <Youtube className="w-7 h-7 text-red-500 shrink-0" />
         {!collapsed && (
-          <span className="font-semibold text-lg tracking-tight">YT Manager</span>
+          <span className="font-semibold text-lg tracking-tight">Wisdom Warriors</span>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
