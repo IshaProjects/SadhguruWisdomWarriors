@@ -1418,6 +1418,7 @@ function VideoReport() {
   const [filters, setFilters] = useState({
     search: '', category: '', status: '', tags: '', classification: '',
     minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '',
+    hashtags: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [sort,  setSort]  = useState('-views');
@@ -1499,7 +1500,7 @@ function VideoReport() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', category: '', status: '', tags: '', classification: '', minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '' });
+    setFilters({ search: '', category: '', status: '', tags: '', classification: '', minViews: '', maxViews: '', startDate: '', endDate: '', channelId: '', hashtags: '' });
     setSelectedChannel(null);
     setChannelSearch('');
     setPage(1);
@@ -1647,8 +1648,23 @@ function VideoReport() {
           </div>
 
           <div>
-            <label className="block text-xs text-dark-400 mb-1">Tags</label>
+            <label className="block text-xs text-dark-400 mb-1">Channel Tags</label>
             <input type="text" placeholder="comma-separated" value={filters.tags} onChange={(e) => handleFilterChange('tags', e.target.value)} className="input-field text-sm w-full" />
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-xs text-dark-400 mb-1">
+              Hashtag Keywords
+              <span className="ml-1 text-dark-500">(searches title &amp; description)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. sadhguru, yoga, meditation"
+              value={filters.hashtags}
+              onChange={(e) => handleFilterChange('hashtags', e.target.value)}
+              className="input-field text-sm w-full"
+            />
+            <p className="text-[10px] text-dark-500 mt-1">Comma-separated. Matches #keyword in video title or description. Returns videos with any matching hashtag.</p>
           </div>
 
           <div className="col-span-2">
