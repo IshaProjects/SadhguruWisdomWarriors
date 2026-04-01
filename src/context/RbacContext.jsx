@@ -18,6 +18,7 @@ export function RbacProvider({ children }) {
       return;
     }
 
+    
     api
       .get('/rbac')
       .then((res) => {
