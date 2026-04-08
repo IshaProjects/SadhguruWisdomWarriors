@@ -467,7 +467,6 @@ function ChannelReport() {
                 <Th label="Category"           col="category"           sort={sort} onSort={handleSort} />
                 <Th label="Status"             col="status"             sort={sort} onSort={handleSort} />
                 <Th label="Sadhguru"           col="sadhguru_count"     sort={sort} onSort={handleSort} />
-                <Th label="Non Sadhguru"       col="non_sadhguru_count" sort={sort} onSort={handleSort} />
                 <Th label="Country"            col="country"            sort={sort} onSort={handleSort} />
                 <Th label="Subscribers"        col="subscribers"        sort={sort} onSort={handleSort} />
                 <Th label="Views in this time range" col={isPeriodMode ? 'views_in_period' : 'total_views'} sort={sort} onSort={handleSort} />
@@ -486,9 +485,9 @@ function ChannelReport() {
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={isPeriodMode ? 15 : 13} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
+                <tr><td colSpan={isPeriodMode ? 15 : 13} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_channel_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -502,7 +501,6 @@ function ChannelReport() {
                     }`}>{r.status}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono text-green-400">{fmt(r.sadhguru_count)}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-dark-300">{fmt(r.non_sadhguru_count)}</td>
                   <td className="px-3 py-2.5 text-dark-300">{r.country || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.subscribers)}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-accent-300">
@@ -1745,13 +1743,16 @@ function VideoReport() {
                   <td className="px-3 py-2.5 text-dark-300 max-w-[160px] truncate" title={r.channel}>{r.channel || '—'}</td>
                   <td className="px-3 py-2.5 text-dark-300">{r.category || '—'}</td>
                   <td className="px-3 py-2.5">
-                    <span className={`badge text-xs ${
-                      r.classification === 'sadhguru' ? 'bg-green-500/20 text-green-400' :
-                      r.classification === 'non sadhguru' ? 'bg-dark-600 text-dark-300' :
-                      'bg-dark-700 text-dark-500'
-                    }`}>
-                      {r.classification || '—'}
-                    </span>
+                    {r.classification === 'non sadhguru' ? (
+                      <span className="text-dark-400">-</span>
+                    ) : (
+                      <span className={`badge text-xs ${
+                        r.classification === 'sadhguru' ? 'bg-green-500/20 text-green-400' :
+                        'bg-dark-700 text-dark-500'
+                      }`}>
+                        {r.classification || '—'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs">{r.published_at || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.views)}</td>
