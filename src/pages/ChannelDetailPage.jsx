@@ -19,6 +19,7 @@ import {
   X,
   Heart,
   MessageCircle,
+  RotateCw,
 } from 'lucide-react';
 import {
   LineChart,
@@ -35,6 +36,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
 import { formatNumber, formatDate, formatRelativeDate, engagementRate, formatDuration } from '../utils/formatters.js';
 import api from '../services/api.js';
 import toast from 'react-hot-toast';
+import { toUtcDateInputValue } from '../utils/dateUtc.js';
 import clsx from 'clsx';
 
 const categories = [
@@ -58,6 +60,8 @@ export default function ChannelDetailPage() {
   const [classifying, setClassifying] = useState(false);
   const [showClassifyModal, setShowClassifyModal] = useState(false);
   const [classificationSummary, setClassificationSummary] = useState(null);
+  const [reclassifying, setReclassifying] = useState(false);
+  const [showReclassifyModal, setShowReclassifyModal] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
@@ -132,7 +136,7 @@ export default function ChannelDetailPage() {
       try {
         const start = new Date();
         start.setDate(start.getDate() - parseInt(trendPeriod));
-        const startDate = start.toISOString().slice(0, 10);
+        const startDate = toUtcDateInputValue(start);
         const res = await api.get(`/video-snapshots/channel/${id}`, {
           params: { startDate },
         });
@@ -210,6 +214,21 @@ export default function ChannelDetailPage() {
     }
   };
 
+  const handleReclassify = async () => {
+    setReclassifying(true);
+    try {
+      const res = await api.post(`/channels/${id}/reclassify-videos`);
+      setShowReclassifyModal(false);
+      setClassificationSummary(res.data);
+      const chRes = await api.get(`/channels/${id}`);
+      setVideos(chRes.data.videos);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reclassification failed');
+    } finally {
+      setReclassifying(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner size="lg" />;
   if (!channel) return null;
 
@@ -226,6 +245,7 @@ export default function ChannelDetailPage() {
     firstSnap && lastSnap
       ? lastSnap.subscribers - firstSnap.subscribers
       : 0;
+  const totalVideosInDb = typeof videoCountInDb === 'number' ? videoCountInDb : videos.length;
 
   return (
     <div>
@@ -251,12 +271,21 @@ export default function ChannelDetailPage() {
             </button>
             <button
               onClick={() => setShowClassifyModal(true)}
-              disabled={classifying || videos.length === 0}
+              disabled={classifying || totalVideosInDb === 0}
               className="btn-secondary text-sm flex items-center gap-1.5"
               title="Classify videos as Sadguru or not using AI"
             >
               <Sparkles className={clsx('w-4 h-4', classifying && 'animate-pulse')} />
               Classify
+            </button>
+            <button
+              onClick={() => setShowReclassifyModal(true)}
+              disabled={reclassifying || totalVideosInDb === 0}
+              className="btn-secondary text-sm flex items-center gap-1.5 text-amber-400 hover:text-amber-300"
+              title="Re-classify all videos (overwrites existing classifications)"
+            >
+              <RotateCw className={clsx('w-4 h-4', reclassifying && 'animate-spin')} />
+              Reclassify
             </button>
             <button
               onClick={handleSync}
@@ -1025,6 +1054,52 @@ export default function ChannelDetailPage() {
                     <>
                       <Sparkles className="w-4 h-4" />
                       Classify
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reclassify Videos Modal */}
+        {showReclassifyModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2 text-amber-400">Reclassify All Videos</h2>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
+                <p className="text-sm text-amber-300 font-medium mb-1">Warning</p>
+                <p className="text-sm text-dark-300">
+                  This will clear all existing classifications and re-classify every video for this channel from scratch. Already classified videos will be overwritten.
+                </p>
+              </div>
+              <p className="text-sm text-dark-400 mb-4">
+                {totalVideosInDb} video{totalVideosInDb !== 1 ? 's' : ''} will be reclassified. This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowReclassifyModal(false)}
+                  disabled={reclassifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium flex items-center gap-1.5 transition-colors"
+                  onClick={handleReclassify}
+                  disabled={reclassifying}
+                >
+                  {reclassifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Reclassifying…
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="w-4 h-4" />
+                      Yes, Reclassify All
                     </>
                   )}
                 </button>

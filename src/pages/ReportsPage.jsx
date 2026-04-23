@@ -7,18 +7,13 @@ import TopBar from '../components/layout/TopBar.jsx';
 import { useCategories } from '../hooks/useCategories.js';
 import api from '../services/api.js';
 import toast from 'react-hot-toast';
+import { getUtcCurrentMonthRange, toUtcDateInputValue } from '../utils/dateUtc.js';
 
 /* ── helpers ── */
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
 
 function getCurrentMonthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate:   end.toISOString().slice(0, 10),
-  };
+  return getUtcCurrentMonthRange();
 }
 
 /* ── Reusable date range picker ──────────────────────────────────────────────
@@ -260,7 +255,7 @@ function ChannelReport() {
       const url  = URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `channel-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
+      a.download = `channel-report-${toUtcDateInputValue()}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`Exported as ${ext.toUpperCase()}`);
@@ -480,14 +475,17 @@ function ChannelReport() {
                 <Th label="Avg Views/Video"    col="avg_views_per_video" sort={sort} onSort={handleSort} />
                 <Th label="Tags"               col="tags"               sort={sort} onSort={handleSort} />
                 <Th label="Assigned To"        col="assigned_to"        sort={sort} onSort={handleSort} />
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-dark-400 uppercase tracking-wide whitespace-nowrap">
+                  Added On
+                </th>
                 <Th label="Last Synced"        col="last_synced"        sort={sort} onSort={handleSort} />
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700/50">
               {loading ? (
-                <tr><td colSpan={isPeriodMode ? 15 : 13} className="text-center py-12 text-dark-400">Loading…</td></tr>
+                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={isPeriodMode ? 15 : 13} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
+                <tr><td colSpan={isPeriodMode ? 16 : 14} className="text-center py-12 text-dark-400">No channels match the current filters.</td></tr>
               ) : rows.map((r, i) => (
                 <tr key={r.youtube_channel_id || i} className="hover:bg-dark-800/40 transition-colors">
                   <td className="px-3 py-2.5 text-dark-500 text-xs">{(page - 1) * LIMIT + i + 1}</td>
@@ -516,6 +514,7 @@ function ChannelReport() {
                   <td className="px-3 py-2.5 text-right font-mono">{fmt(r.avg_views_per_video)}</td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs max-w-[140px] truncate" title={r.tags}>{r.tags || '—'}</td>
                   <td className="px-3 py-2.5 text-dark-300">{r.assigned_to || '—'}</td>
+                  <td className="px-3 py-2.5 text-dark-400 text-xs">{r.added_on || '—'}</td>
                   <td className="px-3 py-2.5 text-dark-400 text-xs">{r.last_synced || '—'}</td>
                 </tr>
               ))}
@@ -679,14 +678,14 @@ function CategoryReport() {
 
   const handleExportCsv = () => {
     setExporting('csv');
-    try { downloadCsv(`category-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported as CSV'); }
+    try { downloadCsv(`category-views-${toUtcDateInputValue()}.csv`); toast.success('Exported as CSV'); }
     catch { toast.error('Export failed'); }
     finally { setExporting(''); }
   };
 
   const handleExportExcel = () => {
     setExporting('excel');
-    try { downloadCsv(`category-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported (CSV format)'); }
+    try { downloadCsv(`category-views-${toUtcDateInputValue()}.csv`); toast.success('Exported (CSV format)'); }
     catch { toast.error('Export failed'); }
     finally { setExporting(''); }
   };
@@ -1143,14 +1142,14 @@ function MicroUnitReport() {
 
   const handleExportCsv = () => {
     setExporting('csv');
-    try { downloadCsv(`micro-unit-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported as CSV'); }
+    try { downloadCsv(`micro-unit-views-${toUtcDateInputValue()}.csv`); toast.success('Exported as CSV'); }
     catch { toast.error('Export failed'); }
     finally { setExporting(''); }
   };
 
   const handleExportExcel = () => {
     setExporting('excel');
-    try { downloadCsv(`micro-unit-views-${new Date().toISOString().slice(0, 10)}.csv`); toast.success('Exported (CSV format)'); }
+    try { downloadCsv(`micro-unit-views-${toUtcDateInputValue()}.csv`); toast.success('Exported (CSV format)'); }
     catch { toast.error('Export failed'); }
     finally { setExporting(''); }
   };
@@ -1518,7 +1517,7 @@ function VideoReport() {
       const url  = URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `video-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
+      a.download = `video-report-${toUtcDateInputValue()}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`Exported as ${ext.toUpperCase()}`);

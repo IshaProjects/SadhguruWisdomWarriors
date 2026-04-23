@@ -379,10 +379,12 @@ function ScheduleField({ label, value, onChange }) {
 const DEFAULT_SYNC_CONFIG = {
   channelSyncSchedule: '0 3 * * *',
   videoSyncSchedule: '0 4 * * *',
+  dedicatedIngestSchedule: '0 */6 * * *',
   ihiIngestSchedule: '0 */6 * * *',
   ihiSadhguruStatsSchedule: '0 5 * * *',
   channelSyncEnabled: true,
   videoSyncEnabled: true,
+  dedicatedIngestEnabled: true,
   ihiIngestEnabled: true,
   ihiSadhguruStatsEnabled: true,
 };
@@ -394,6 +396,7 @@ export default function SyncPage() {
 
   const canTriggerChannel = canPerformAction('sync.triggerChannel');
   const canTriggerVideo   = canPerformAction('sync.triggerVideo');
+  const canTriggerDedicatedIngest = canPerformAction('sync.triggerVideo');
   const canTriggerIhiIngest = canPerformAction('sync.triggerIhiIngest');
   const canTriggerIhiSadhguruStats = canPerformAction('sync.triggerIhiSadhguruStats');
   const canConfigure      = canPerformAction('sync.configure');
@@ -469,6 +472,15 @@ export default function SyncPage() {
       toast.error(err.response?.data?.message || 'Could not start IHI ingest');
     }
   };
+  const runDedicatedIngest = async () => {
+    try {
+      await api.post('/sync/dedicated/ingest/trigger');
+      toast.success('Dedicated ingest started');
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start dedicated ingest');
+    }
+  };
   const runIhiSadhguruStats = async () => {
     try {
       await api.post('/sync/ihi/sadhguru-stats/trigger');
@@ -491,7 +503,7 @@ export default function SyncPage() {
       <div className="p-6 space-y-6">
 
         <p className="text-sm text-dark-400 max-w-3xl leading-relaxed">
-          Four separate batch jobs run on their own schedules. Use <span className="text-dark-300">Run now</span> to
+          Five separate batch jobs run on their own schedules. Use <span className="text-dark-300">Run now</span> to
           trigger one manually. Dedicated video sync applies only to channels whose category starts with
           &quot;Dedicated&quot;. IHI jobs apply to channels whose category contains &quot;IHI&quot; (and not Dedicated).
         </p>
@@ -522,6 +534,16 @@ export default function SyncPage() {
               isRunning={!!status?.isVideoSyncing}
               canTrigger={canTriggerVideo}
               onRun={runDedicatedVideoSync}
+            />
+            <BatchJobCard
+              icon={Sparkles}
+              title="Dedicated ingest"
+              description="For Dedicated channels: loads uploads from the last 24 hours and auto-classifies new videos as sadhguru."
+              scheduleExpr={draft?.dedicatedIngestSchedule}
+              scheduleEnabled={draft?.dedicatedIngestEnabled}
+              isRunning={!!status?.isDedicatedIngestSyncing}
+              canTrigger={canTriggerDedicatedIngest}
+              onRun={runDedicatedIngest}
             />
             <BatchJobCard
               icon={Sparkles}
@@ -673,6 +695,46 @@ export default function SyncPage() {
                 )}
               </div>
 
+              {/* Dedicated ingest config */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-dark-400" />
+                    <span className="text-sm font-medium">Dedicated Ingest</span>
+                  </div>
+                  {canConfigure ? (
+                    <button
+                      onClick={() => setDraft((d) => ({ ...d, dedicatedIngestEnabled: !d.dedicatedIngestEnabled }))}
+                      className="flex items-center gap-1.5 text-xs"
+                    >
+                      {draft.dedicatedIngestEnabled
+                        ? <ToggleRight className="w-5 h-5 text-green-400" />
+                        : <ToggleLeft  className="w-5 h-5 text-dark-500"  />}
+                      <span className={draft.dedicatedIngestEnabled ? 'text-green-400' : 'text-dark-500'}>
+                        {draft.dedicatedIngestEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className={clsx('text-xs', draft.dedicatedIngestEnabled ? 'text-green-400' : 'text-dark-500')}>
+                      {draft.dedicatedIngestEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  )}
+                </div>
+                {canConfigure ? (
+                  <ScheduleField
+                    label="Cron (24h window + auto classify)"
+                    value={draft.dedicatedIngestSchedule}
+                    onChange={(v) => setDraft((d) => ({ ...d, dedicatedIngestSchedule: v }))}
+                  />
+                ) : (
+                  <div>
+                    <p className="text-xs text-dark-400 mb-1">Cron expression</p>
+                    <p className="text-sm font-mono text-dark-300">{draft.dedicatedIngestSchedule}</p>
+                    <p className="text-xs text-dark-500 mt-0.5">{describeCron(draft.dedicatedIngestSchedule)}</p>
+                  </div>
+                )}
+              </div>
+
               {/* IHI ingest */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -791,6 +853,15 @@ export default function SyncPage() {
           icon={Sparkles}
           triggerEndpoint="/sync/ihi/ingest/trigger"
           canTrigger={canTriggerIhiIngest}
+          showTrigger={false}
+        />
+
+        <SyncLogTable
+          syncType="dedicated_ingest"
+          label="Dedicated Ingest"
+          icon={Sparkles}
+          triggerEndpoint="/sync/dedicated/ingest/trigger"
+          canTrigger={canTriggerDedicatedIngest}
           showTrigger={false}
         />
 

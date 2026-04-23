@@ -1,3 +1,5 @@
+import { formatDateUtc } from './dateUtc.js';
+
 export function formatNumber(num) {
   if (num == null) return '0';
   const n = Number(num);
@@ -8,12 +10,7 @@ export function formatNumber(num) {
 }
 
 export function formatDate(dateStr) {
-  if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatDateUtc(dateStr);
 }
 
 export function formatRelativeDate(dateStr) {

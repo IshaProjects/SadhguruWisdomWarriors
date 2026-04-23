@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import api from '../../services/api.js';
 import { useRbac } from '../../context/RbacContext.jsx';
 import InfoTooltip from '../common/InfoTooltip.jsx';
+import { formatDateUtc } from '../../utils/dateUtc.js';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -424,7 +425,7 @@ export default function VideoQueue() {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="py-3 px-3 text-xs text-dark-500 whitespace-nowrap">
-                      {new Date(item.createdAt).toLocaleDateString()}
+                      {formatDateUtc(item.createdAt)}
                     </td>
                     {canAdd && (
                       <td className="py-3 px-3">

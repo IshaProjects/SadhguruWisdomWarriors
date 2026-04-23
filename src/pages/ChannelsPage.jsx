@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X, Sparkles } from 'lucide-react';
+import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X, Sparkles, RotateCw } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import ChannelTable from '../components/channels/ChannelTable.jsx';
 import ChannelCard from '../components/channels/ChannelCard.jsx';
@@ -36,6 +36,8 @@ export default function ChannelsPage() {
   const [classifyingAll, setClassifyingAll] = useState(false);
   const [showClassifyAllModal, setShowClassifyAllModal] = useState(false);
   const [classifyAllResult, setClassifyAllResult] = useState(null);
+  const [reclassifyingChannel, setReclassifyingChannel] = useState(null);
+  const [reclassifying, setReclassifying] = useState(false);
 
   // Bulk-select state
   const [selectedIds, setSelectedIds]         = useState(new Set());
@@ -202,6 +204,21 @@ export default function ChannelsPage() {
     }
   };
 
+  const handleReclassify = async () => {
+    if (!reclassifyingChannel) return;
+    setReclassifying(true);
+    try {
+      const res = await api.post(`/channels/${reclassifyingChannel._id}/reclassify-videos`);
+      setReclassifyingChannel(null);
+      setClassificationSummary(res.data);
+      fetchChannels(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reclassification failed');
+    } finally {
+      setReclassifying(false);
+    }
+  };
+
   const canDelete = canPerformAction('channels.delete');
   const hasSelection = selectedIds.size > 0;
 
@@ -333,6 +350,7 @@ export default function ChannelsPage() {
               onEdit={canPerformAction('channels.edit') ? (ch) => setEditingChannel(ch) : null}
               onDelete={canPerformAction('channels.delete') ? (ch) => setDeletingChannel(ch) : null}
               onClassify={canPerformAction('channels.sync') ? (ch) => setClassifyingChannel(ch) : null}
+              onReclassify={canPerformAction('channels.delete') ? (ch) => setReclassifyingChannel(ch) : null}
               selectedIds={selectedIds}
               onToggleSelect={canDelete ? handleToggleSelect : null}
               onToggleAll={canDelete ? handleToggleAll : null}
@@ -588,6 +606,52 @@ export default function ChannelsPage() {
                     <>
                       <Sparkles className="w-4 h-4" />
                       Classify
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Reclassify confirmation ── */}
+        {reclassifyingChannel && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-2 text-amber-400">Reclassify All Videos</h2>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
+                <p className="text-sm text-amber-300 font-medium mb-1">Warning</p>
+                <p className="text-sm text-dark-300">
+                  This will clear all existing classifications for <span className="font-semibold">{reclassifyingChannel.title}</span> and re-classify every video from scratch. Already classified videos will be overwritten.
+                </p>
+              </div>
+              <p className="text-sm text-dark-400 mb-4">
+                This action cannot be undone. Are you sure you want to continue?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setReclassifyingChannel(null)}
+                  disabled={reclassifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium flex items-center gap-1.5 transition-colors"
+                  onClick={handleReclassify}
+                  disabled={reclassifying}
+                >
+                  {reclassifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Reclassifying…
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="w-4 h-4" />
+                      Yes, Reclassify All
                     </>
                   )}
                 </button>

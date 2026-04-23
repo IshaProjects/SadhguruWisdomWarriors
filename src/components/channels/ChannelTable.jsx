@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2, Sparkles, Check } from 'lucide-react';
-import { formatNumber, formatRelativeDate } from '../../utils/formatters.js';
+import { Pencil, Trash2, Sparkles, Check, RotateCw } from 'lucide-react';
+import { formatDate, formatNumber, formatRelativeDate } from '../../utils/formatters.js';
 import clsx from 'clsx';
 
 const statusBadge = {
@@ -14,13 +14,14 @@ export default function ChannelTable({
   onEdit,
   onDelete,
   onClassify,
+  onReclassify,
   // bulk-select props
   selectedIds = new Set(),
   onToggleSelect,
   onToggleAll,
 }) {
   const navigate      = useNavigate();
-  const showActions   = !!(onEdit || onDelete || onClassify);
+  const showActions   = !!(onEdit || onDelete || onClassify || onReclassify);
   const showCheckbox  = !!(onToggleSelect && onToggleAll);
   const allSelected   = channels.length > 0 && channels.every((ch) => selectedIds.has(ch._id));
   const someSelected  = channels.some((ch) => selectedIds.has(ch._id));
@@ -51,6 +52,7 @@ export default function ChannelTable({
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Category</th>
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Status</th>
             <th className="text-left py-3 px-3 text-dark-400 font-medium">Owner</th>
+            <th className="text-right py-3 px-3 text-dark-400 font-medium">Added On</th>
             <th className="text-right py-3 px-3 text-dark-400 font-medium">Last Synced</th>
             {showActions && (
               <th className="text-right py-3 px-3 text-dark-400 font-medium">Actions</th>
@@ -119,6 +121,9 @@ export default function ChannelTable({
                   {ch.assignedTo?.name || '—'}
                 </td>
                 <td className="py-3 px-3 text-right text-dark-400 text-sm">
+                  {ch.createdAt ? formatDate(ch.createdAt) : '—'}
+                </td>
+                <td className="py-3 px-3 text-right text-dark-400 text-sm">
                   {formatRelativeDate(ch.lastSyncedAt)}
                 </td>
                 {showActions && (
@@ -133,6 +138,17 @@ export default function ChannelTable({
                           title="Classify videos as Sadguru or not"
                         >
                           <Sparkles className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onReclassify && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onReclassify(ch); }}
+                          className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-amber-400"
+                          aria-label="Reclassify all videos"
+                          title="Re-classify all videos (overwrites existing)"
+                        >
+                          <RotateCw className="w-4 h-4" />
                         </button>
                       )}
                       {onEdit && (
@@ -164,7 +180,7 @@ export default function ChannelTable({
             {channels.length === 0 && (
             <tr>
               <td
-                colSpan={(showCheckbox ? 1 : 0) + (showActions ? 10 : 9)}
+                colSpan={(showCheckbox ? 1 : 0) + (showActions ? 11 : 10)}
                 className="py-12 text-center text-dark-400"
               >
                 No channels found. Add your first channel to get started.

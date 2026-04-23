@@ -1,3 +1,5 @@
+import { toUtcDateInputValue } from './dateUtc.js';
+
 /**
  * Converts an array of objects to a CSV string and triggers a browser download.
  * @param {string}   filename - Filename without extension
@@ -23,7 +25,7 @@ export function exportToCsv(filename, headers, rows) {
   const url  = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href     = url;
-  link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `${filename}_${toUtcDateInputValue()}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
