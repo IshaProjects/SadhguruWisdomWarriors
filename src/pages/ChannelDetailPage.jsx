@@ -273,7 +273,7 @@ export default function ChannelDetailPage() {
               onClick={() => setShowClassifyModal(true)}
               disabled={classifying || totalVideosInDb === 0}
               className="btn-secondary text-sm flex items-center gap-1.5"
-              title="Classify videos as Sadguru or not using AI"
+              title="Classify videos as Sadhguru or not using AI"
             >
               <Sparkles className={clsx('w-4 h-4', classifying && 'animate-pulse')} />
               Classify
@@ -664,7 +664,7 @@ export default function ChannelDetailPage() {
                   <th className="text-left py-2 px-2 text-dark-400 font-medium">Video</th>
                   <th
                     className="text-center py-2 px-2 text-dark-400 font-medium cursor-help"
-                    title="Classification: sadguru / non sadhguru. Click Classify to run."
+                    title="Classification: sadhguru / -. Click Classify to run."
                   >
                     Classification
                   </th>
@@ -710,7 +710,7 @@ export default function ChannelDetailPage() {
                             <span className="badge bg-green-500/20 text-green-300 text-xs">sadhguru</span>
                           )}
                           {((v.classification === 'non sadhguru') || (v.isSadguruVideo === false)) && (
-                            <span className="badge bg-dark-700 text-dark-400 text-xs">non sadhguru</span>
+                            <span className="badge bg-dark-700 text-dark-400 text-xs">-</span>
                           )}
                           {(!v.classification || v.classification.trim() === '') && v.isSadguruVideo == null && (
                             <span className="text-dark-500 text-xs">—</span>
@@ -838,7 +838,7 @@ export default function ChannelDetailPage() {
                 >
                   <option value="">All</option>
                   <option value="sadhguru">Sadhguru</option>
-                  <option value="non_sadhguru">Non Sadhguru</option>
+                  <option value="non_sadhguru">-</option>
                 </select>
               </div>
               <div>
@@ -936,7 +936,7 @@ export default function ChannelDetailPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             {v.classification === 'sadhguru' && <span className="badge bg-green-500/20 text-green-400 text-xs">sadhguru</span>}
-                            {v.classification === 'non sadhguru' && <span className="badge bg-dark-700 text-dark-400 text-xs">non sadhguru</span>}
+                            {v.classification === 'non sadhguru' && <span className="badge bg-dark-700 text-dark-400 text-xs">-</span>}
                             {(!v.classification || !v.classification.trim()) && <span className="text-dark-500 text-xs">—</span>}
                           </td>
                           <td className="px-3 py-2.5 text-right font-mono">{formatNumber(v.views)}</td>
@@ -1028,7 +1028,7 @@ export default function ChannelDetailPage() {
             <div className="glass-card w-full max-w-md p-6">
               <h2 className="text-lg font-semibold mb-2">Classify Videos</h2>
               <p className="text-sm text-dark-300 mb-4">
-                Classify all videos for this channel as Sadguru video or not. Each video title will be sent to Vertex AI to determine if it features Sadguru content. Results will be saved for every video.
+                Classify all videos for this channel as Sadhguru video or not. Each video title will be sent to Vertex AI to determine if it features Sadhguru content. Results will be saved for every video.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -1115,7 +1115,7 @@ export default function ChannelDetailPage() {
               <h2 className="text-lg font-semibold mb-4">Classification Complete</h2>
               {classificationSummary.isSadhguruChannel && (
                 <p className="text-sm text-accent-300 mb-4 p-3 rounded-lg bg-accent-500/10">
-                  This is a Sadguru (Dedicated) channel. All unclassified videos were marked as sadguru by default — no AI call was needed.
+                  This is a Sadhguru (Dedicated) channel. All unclassified videos were marked as sadhguru by default — no AI call was needed.
                 </p>
               )}
               <div className="space-y-2 text-sm">
@@ -1140,11 +1140,11 @@ export default function ChannelDetailPage() {
                 {!classificationSummary.isSadhguruChannel && classificationSummary.newlyClassified > 0 && (
                   <>
                     <p className="flex justify-between pt-2 border-t border-dark-700">
-                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="text-dark-400">→ Sadhguru</span>
                       <span className="font-medium text-green-400">{classificationSummary.sadhguruCount}</span>
                     </p>
                     <p className="flex justify-between">
-                      <span className="text-dark-400">→ Non sadhguru</span>
+                      <span className="text-dark-400">→ -</span>
                       <span className="font-medium">{classificationSummary.nonSadguruCount}</span>
                     </p>
                   </>

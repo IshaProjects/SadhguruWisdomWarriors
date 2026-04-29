@@ -43,7 +43,7 @@ export default function ChannelCard({ channel, onClassify }) {
               onClick={(e) => { e.stopPropagation(); onClassify(channel); }}
               className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-accent-400"
               aria-label="Classify videos"
-              title="Classify videos as Sadguru or not"
+              title="Classify videos as Sadhguru or not"
             >
               <Sparkles className="w-3.5 h-3.5" />
             </button>

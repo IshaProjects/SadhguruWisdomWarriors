@@ -43,6 +43,9 @@ export default function ChannelsPage() {
   const [selectedIds, setSelectedIds]         = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting]       = useState(false);
+  const [showBulkReclassifyConfirm, setShowBulkReclassifyConfirm] = useState(false);
+  const [bulkReclassifying, setBulkReclassifying] = useState(false);
+  const [bulkReclassifyResult, setBulkReclassifyResult] = useState(null);
 
   const fetchChannels = useCallback(async (page = 1) => {
     setLoading(true);
@@ -110,6 +113,23 @@ export default function ChannelsPage() {
       toast.error(err.response?.data?.message || 'Bulk delete failed');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  /* ── Bulk reclassify ── */
+  const handleBulkReclassify = async () => {
+    setBulkReclassifying(true);
+    try {
+      const ids = [...selectedIds];
+      const res = await api.post('/channels/reclassify-bulk', { ids });
+      setShowBulkReclassifyConfirm(false);
+      clearSelection();
+      setBulkReclassifyResult(res.data);
+      fetchChannels(pagination.page);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk reclassification failed');
+    } finally {
+      setBulkReclassifying(false);
     }
   };
 
@@ -329,13 +349,22 @@ export default function ChannelsPage() {
             <div className="flex-1" />
 
             {canDelete && (
-              <button
-                onClick={() => setShowBulkConfirm(true)}
-                className="btn-danger text-sm flex items-center gap-1.5"
-              >
-                <Trash2 className="w-4 h-4" />
-                Archive {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowBulkReclassifyConfirm(true)}
+                  className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <RotateCw className="w-4 h-4" />
+                  Reclassify {selectedIds.size}
+                </button>
+                <button
+                  onClick={() => setShowBulkConfirm(true)}
+                  className="btn-danger text-sm flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Archive {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -399,7 +428,7 @@ export default function ChannelsPage() {
             <div className="glass-card w-full max-w-md p-6">
               <h2 className="text-lg font-semibold mb-2">Classify All Videos</h2>
               <p className="text-sm text-dark-300 mb-4">
-                Classify all videos for all channels? Dedicated channels will be marked as Sadguru automatically. IHI and other channels will use AI (Vertex AI / Gemini) to classify each video.
+                Classify all videos for all channels? Dedicated channels will be marked as Sadhguru automatically. IHI and other channels will use AI (Vertex AI / Gemini) to classify each video.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -454,11 +483,11 @@ export default function ChannelsPage() {
                 {classifyAllResult.totalNewlyClassified > 0 && (
                   <>
                     <p className="flex justify-between pt-2 border-t border-dark-700">
-                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="text-dark-400">→ Sadhguru</span>
                       <span className="font-medium text-green-400">{classifyAllResult.totalSadguru}</span>
                     </p>
                     <p className="flex justify-between">
-                      <span className="text-dark-400">→ Non sadguru</span>
+                  <span className="text-dark-400">→ -</span>
                       <span className="font-medium">{classifyAllResult.totalNonSadguru}</span>
                     </p>
                   </>
@@ -580,7 +609,7 @@ export default function ChannelsPage() {
             <div className="glass-card w-full max-w-md p-6">
               <h2 className="text-lg font-semibold mb-2">Classify Videos</h2>
               <p className="text-sm text-dark-300 mb-4">
-                Classify all videos for <span className="font-semibold">{classifyingChannel.title}</span> as Sadguru video or not? Each video title will be sent to Vertex AI to determine if it features Sadguru content.
+                Classify all videos for <span className="font-semibold">{classifyingChannel.title}</span> as Sadhguru video or not? Each video title will be sent to Vertex AI to determine if it features Sadhguru content.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -667,7 +696,7 @@ export default function ChannelsPage() {
               <h2 className="text-lg font-semibold mb-4">Classification Complete</h2>
               {classificationSummary.isSadhguruChannel && (
                 <p className="text-sm text-accent-300 mb-4 p-3 rounded-lg bg-accent-500/10">
-                  This is a Sadguru (Dedicated) channel. All unclassified videos were marked as sadguru by default — no AI call was needed.
+                  This is a Sadhguru (Dedicated) channel. All unclassified videos were marked as sadhguru by default — no AI call was needed.
                 </p>
               )}
               <div className="space-y-2 text-sm">
@@ -692,7 +721,7 @@ export default function ChannelsPage() {
                 {!classificationSummary.isSadhguruChannel && classificationSummary.newlyClassified > 0 && (
                   <>
                     <p className="flex justify-between pt-2 border-t border-dark-700">
-                      <span className="text-dark-400">→ Sadguru</span>
+                      <span className="text-dark-400">→ Sadhguru</span>
                       <span className="font-medium text-green-400">{classificationSummary.sadhguruCount}</span>
                     </p>
                     <p className="flex justify-between">
@@ -769,6 +798,110 @@ export default function ChannelsPage() {
                       Archive {selectedIds.size} channel{selectedIds.size !== 1 ? 's' : ''}
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bulk reclassify confirmation ── */}
+        {showBulkReclassifyConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-sm p-6">
+              <h2 className="text-lg font-semibold mb-2 text-amber-400">Reclassify {selectedIds.size} channels</h2>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
+                <p className="text-sm text-amber-300 font-medium mb-1">Warning</p>
+                <p className="text-sm text-dark-300">
+                  This will clear all existing classifications for the selected channels and re-classify every video from scratch.
+                </p>
+              </div>
+              <p className="text-sm text-dark-400 mb-4">
+                Dedicated channels will be set to sadguru. IHI/other channels will be classified using Vertex AI.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  className="btn-secondary"
+                  onClick={() => setShowBulkReclassifyConfirm(false)}
+                  disabled={bulkReclassifying}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  onClick={handleBulkReclassify}
+                  disabled={bulkReclassifying}
+                >
+                  {bulkReclassifying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Reclassifying…
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="w-4 h-4" />
+                      Yes, Reclassify
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bulk reclassify result ── */}
+        {bulkReclassifyResult && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="glass-card w-full max-w-md p-6">
+              <h2 className="text-lg font-semibold mb-4">Bulk Reclassification Complete</h2>
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Channels requested</span>
+                  <span className="font-medium">{bulkReclassifyResult.channelsRequested}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Channels processed</span>
+                  <span className="font-medium">{bulkReclassifyResult.channelsProcessed}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Total videos</span>
+                  <span className="font-medium">{bulkReclassifyResult.totalVideos}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">Newly classified</span>
+                  <span className="font-medium text-green-400">{bulkReclassifyResult.totalNewlyClassified}</span>
+                </p>
+                <p className="flex justify-between pt-2 border-t border-dark-700">
+                  <span className="text-dark-400">→ Sadhguru</span>
+                  <span className="font-medium text-green-400">{bulkReclassifyResult.totalSadguru}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-dark-400">→ -</span>
+                  <span className="font-medium">{bulkReclassifyResult.totalNonSadguru}</span>
+                </p>
+                {bulkReclassifyResult.totalFailed > 0 && (
+                  <p className="flex justify-between">
+                    <span className="text-dark-400">Could not process</span>
+                    <span className="font-medium text-red-400">{bulkReclassifyResult.totalFailed}</span>
+                  </p>
+                )}
+                {bulkReclassifyResult.errors?.length > 0 && (
+                  <div className="pt-2 border-t border-dark-700">
+                    <p className="text-dark-400 mb-2">Errors:</p>
+                    <ul className="text-xs text-red-400 space-y-1 max-h-24 overflow-y-auto">
+                      {bulkReclassifyResult.errors.map((e, i) => (
+                        <li key={i}>{e.title}: {e.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setBulkReclassifyResult(null)}
+                >
+                  OK
                 </button>
               </div>
             </div>

@@ -135,7 +135,7 @@ export default function ChannelTable({
                           onClick={(e) => { e.stopPropagation(); onClassify(ch); }}
                           className="p-1.5 rounded hover:bg-dark-700 text-dark-300 hover:text-accent-400"
                           aria-label="Classify videos"
-                          title="Classify videos as Sadguru or not"
+                          title="Classify videos as Sadhguru or not"
                         >
                           <Sparkles className="w-4 h-4" />
                         </button>
