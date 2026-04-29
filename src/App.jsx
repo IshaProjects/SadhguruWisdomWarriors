@@ -82,7 +82,7 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<DashboardPage />}/>
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/channels" element={<RbacRoute pageKey="channels"><ChannelsPage /></RbacRoute>} />
         <Route path="/channels/import" element={<RbacRoute pageKey="import"><ImportPage /></RbacRoute>} />
         <Route path="/channels/:id" element={<RbacRoute pageKey="channels"><ChannelDetailPage /></RbacRoute>} />
