@@ -4,6 +4,7 @@ import api from '../../services/api.js';
 import toast from 'react-hot-toast';
 import { useCategories } from '../../hooks/useCategories.js';
 
+
 export default function AddChannelModal({ open, onClose, onAdded }) {
   const [channelInput, setChannelInput] = useState('');
   const [category, setCategory] = useState('Uncategorized');
