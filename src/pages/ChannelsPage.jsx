@@ -293,7 +293,7 @@ export default function ChannelsPage() {
                   onClick={() => setShowClassifyAllModal(true)}
                   disabled={classifyingAll}
                   className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
-                  title="Classify all videos for all channels (Dedicated = sadguru, IHI/other = AI)"
+                  title="Classify all videos for all channels (Dedicated = sadhguru, IHI/other = AI)"
                 >
                   <Sparkles className={clsx('w-4 h-4', classifyingAll && 'animate-pulse')} />
                   Classify All
@@ -816,7 +816,7 @@ export default function ChannelsPage() {
                 </p>
               </div>
               <p className="text-sm text-dark-400 mb-4">
-                Dedicated channels will be set to sadguru. IHI/other channels will be classified using Vertex AI.
+                Dedicated channels will be set to sadhguru. IHI/other channels will be classified using Vertex AI.
               </p>
               <div className="flex gap-3 justify-end">
                 <button
