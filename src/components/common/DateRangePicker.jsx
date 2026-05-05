@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/style.css';
 import { Calendar, X } from 'lucide-react';
@@ -44,11 +45,25 @@ export default function DateRangePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ from: fromYmd(startDate), to: fromYmd(endDate) });
+  const [pos, setPos] = useState(null);
   const popoverRef = useRef(null);
   const triggerRef = useRef(null);
 
   useEffect(() => {
-    if (open) setDraft({ from: fromYmd(startDate), to: fromYmd(endDate) });
+    if (!open) return;
+    setDraft({ from: fromYmd(startDate), to: fromYmd(endDate) });
+    const updatePos = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      setPos({ top: r.bottom + 8, left: r.left, right: window.innerWidth - r.right });
+    };
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
   }, [open, startDate, endDate]);
 
   useEffect(() => {
@@ -81,6 +96,12 @@ export default function DateRangePicker({
     ? `${formatDateUtc(startDate)} → ${formatDateUtc(endDate)}`
     : 'Pick a date range';
 
+  const popoverStyle = pos
+    ? align === 'right'
+      ? { position: 'fixed', top: pos.top, right: pos.right, zIndex: 1000 }
+      : { position: 'fixed', top: pos.top, left: pos.left, zIndex: 1000 }
+    : { display: 'none' };
+
   return (
     <div className={`relative ${className}`}>
       <button
@@ -93,10 +114,11 @@ export default function DateRangePicker({
         <span className="flex-1 text-left">{buttonLabel}</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={popoverRef}
-          className={`drp-popover absolute z-50 mt-2 ${align === 'right' ? 'right-0' : 'left-0'} bg-dark-800 border border-dark-700 rounded-lg shadow-xl p-3 flex gap-3`}
+          style={popoverStyle}
+          className="drp-popover bg-dark-800 border border-dark-700 rounded-lg shadow-xl p-3 flex gap-3"
         >
           <div className="flex flex-col gap-0.5 w-32 border-r border-dark-700 pr-2">
             {presets.map((p) => (
@@ -148,7 +170,8 @@ export default function DateRangePicker({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
