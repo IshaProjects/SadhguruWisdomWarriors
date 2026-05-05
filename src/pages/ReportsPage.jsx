@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
-  ChevronsUpDown, RefreshCw, Tv2, Video, Tag, CalendarRange, Layers,
+  ChevronsUpDown, RefreshCw, Tv2, Video, Tag, Layers,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
+import DateRangePicker from '../components/common/DateRangePicker.jsx';
 import { useCategories } from '../hooks/useCategories.js';
 import api from '../services/api.js';
 import toast from 'react-hot-toast';
@@ -16,56 +17,7 @@ function getCurrentMonthRange() {
   return getUtcCurrentMonthRange();
 }
 
-/* ── Reusable date range picker ──────────────────────────────────────────────
-   Renders two date inputs (Start / End) and calls onChange whenever either
-   changes. Clears both with a single ✕ button when a range is active.
-   Props:
-     startDate / endDate  – controlled string values (YYYY-MM-DD)
-     onStartDate / onEndDate – individual change handlers
-     onClear – clears both dates
-*/
-function DateRangeFilter({ startDate, endDate, onStartDate, onEndDate, onClear }) {
-  const hasRange = startDate || endDate;
-  return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="flex items-center gap-1.5 text-xs text-dark-400 shrink-0">
-        <CalendarRange className="w-3.5 h-3.5" />
-        <span className="font-medium">Date Range</span>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <div>
-          <label className="block text-xs text-dark-500 mb-1">From</label>
-          <input
-            type="date"
-            value={startDate}
-            max={endDate || undefined}
-            onChange={(e) => onStartDate(e.target.value)}
-            className="input-field text-xs w-36"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-dark-500 mb-1">To</label>
-          <input
-            type="date"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(e) => onEndDate(e.target.value)}
-            className="input-field text-xs w-36"
-          />
-        </div>
-        {hasRange && (
-          <button
-            onClick={onClear}
-            className="mt-4 p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200 transition-colors"
-            title="Clear date range"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+/* Single popover-style date range picker with presets — see DateRangePicker.jsx */
 
 function OutlierBadge({ score }) {
   if (score == null) return <span className="text-dark-500">—</span>;
@@ -180,8 +132,12 @@ function ChannelReport() {
   const [exporting,  setExporting]  = useState('');
 
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
   const fetchData = useCallback(async (f, s, p) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
@@ -190,14 +146,15 @@ function ChannelReport() {
       params.sort = isPeriodSort ? s : s.replace('subscribers', 'currentStats.subscribers')
                                          .replace('total_views', 'currentStats.views')
                                          .replace('video_count', 'currentStats.videoCount');
-      const res = await api.get('/export/report/channels', { params });
+      const res = await api.get('/export/report/channels', { params, signal: controller.signal });
       setRows(res.data.data);
       setPagination(res.data.pagination);
       setSummary(res.data.summary ?? null);
-    } catch {
+    } catch (err) {
+      if (err?.code === 'ERR_CANCELED') return;
       toast.error('Failed to load channel report');
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, []);
 
@@ -291,37 +248,15 @@ function ChannelReport() {
               className="input-field pl-9 w-full text-sm"
             />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <input
-              type="date"
-              value={filters.startDate}
-              max={filters.endDate || undefined}
-              onChange={(e) => handleFilterChange('startDate', e.target.value)}
-              className="input-field text-sm w-36"
-              title="From"
+          <div className="shrink-0">
+            <DateRangePicker
+              startDate={filters.startDate}
+              endDate={filters.endDate}
+              onChange={({ startDate, endDate }) => {
+                setFilters((prev) => ({ ...prev, startDate, endDate }));
+                setPage(1);
+              }}
             />
-            <span className="text-dark-500 text-sm">→</span>
-            <input
-              type="date"
-              value={filters.endDate}
-              min={filters.startDate || undefined}
-              onChange={(e) => handleFilterChange('endDate', e.target.value)}
-              className="input-field text-sm w-36"
-              title="To"
-            />
-            {(filters.startDate || filters.endDate) && (
-              <button
-                onClick={() => {
-                  const { startDate, endDate } = getCurrentMonthRange();
-                  setFilters((prev) => ({ ...prev, startDate, endDate }));
-                  setPage(1);
-                }}
-                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
-                title="Reset to current month"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
@@ -385,7 +320,6 @@ function ChannelReport() {
             <select value={filters.classification} onChange={(e) => handleFilterChange('classification', e.target.value)} className="input-field text-sm w-full">
               <option value="">All</option>
               <option value="sadhguru">Has Sadhguru videos</option>
-              <option value="non_sadhguru">Has Non Sadhguru videos</option>
             </select>
           </div>
           <div>
@@ -559,8 +493,13 @@ function CategoryReport() {
   const [showFilters, setShowFilters] = useState(false);
   const [exporting,   setExporting]   = useState('');
 
+  const abortRef = useRef(null);
+
   // ── fetch from server ─────────────────────────────────────────────────────
   const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, cf = classificationFilter, sd = startDate, ed = endDate, gf = groupFilter) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
       const params = {};
@@ -570,12 +509,13 @@ function CategoryReport() {
       if (gf) params.group = gf;
       if (sd) params.startDate = sd;
       if (ed) params.endDate = ed;
-      const res = await api.get('/dashboard/categories', { params });
+      const res = await api.get('/dashboard/categories', { params, signal: controller.signal });
       setRows(res.data);
-    } catch {
+    } catch (err) {
+      if (err?.code === 'ERR_CANCELED') return;
       toast.error('Failed to load category report');
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, [statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter]);
 
@@ -733,38 +673,16 @@ function CategoryReport() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <input
-              type="date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(e) => { const v = e.target.value; setStartDate(v); fetchData(statusFilter, tagsFilter, classificationFilter, v, endDate, groupFilter); }}
-              className="input-field text-sm w-36"
-              title="From"
+          <div className="shrink-0">
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: sd, endDate: ed }) => {
+                setStartDate(sd);
+                setEndDate(ed);
+                fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
+              }}
             />
-            <span className="text-dark-500 text-sm">→</span>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, e.target.value, groupFilter); }}
-              className="input-field text-sm w-36"
-              title="To"
-            />
-            {(startDate || endDate) && (
-              <button
-                onClick={() => {
-                  const { startDate: sd, endDate: ed } = getCurrentMonthRange();
-                  setStartDate(sd);
-                  setEndDate(ed);
-                  fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
-                }}
-                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
-                title="Reset to current month"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
@@ -864,7 +782,6 @@ function CategoryReport() {
               className="input-field text-sm w-full">
               <option value="">All channels</option>
               <option value="sadhguru">Has Sadhguru videos</option>
-              <option value="non_sadhguru">Has Non Sadhguru videos</option>
             </select>
           </div>
 
@@ -1034,7 +951,12 @@ function MicroUnitReport() {
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState('');
 
+  const abortRef = useRef(null);
+
   const fetchData = useCallback(async (sf = statusFilter, tf = tagsFilter, cf = classificationFilter, sd = startDate, ed = endDate, gf = groupFilter) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
       const params = {};
@@ -1044,12 +966,13 @@ function MicroUnitReport() {
       if (sd) params.startDate = sd;
       if (ed) params.endDate = ed;
       if (gf) params.group = gf;
-      const res = await api.get('/dashboard/micro-units-report', { params });
+      const res = await api.get('/dashboard/micro-units-report', { params, signal: controller.signal });
       setRows(res.data);
-    } catch {
+    } catch (err) {
+      if (err?.code === 'ERR_CANCELED') return;
       toast.error('Failed to load micro unit report');
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, [statusFilter, tagsFilter, classificationFilter, startDate, endDate, groupFilter]);
 
@@ -1192,38 +1115,16 @@ function MicroUnitReport() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <input
-              type="date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(e) => { const v = e.target.value; setStartDate(v); fetchData(statusFilter, tagsFilter, classificationFilter, v, endDate, groupFilter); }}
-              className="input-field text-sm w-36"
-              title="From"
+          <div className="shrink-0">
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: sd, endDate: ed }) => {
+                setStartDate(sd);
+                setEndDate(ed);
+                fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
+              }}
             />
-            <span className="text-dark-500 text-sm">→</span>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => { setEndDate(e.target.value); fetchData(statusFilter, tagsFilter, classificationFilter, startDate, e.target.value, groupFilter); }}
-              className="input-field text-sm w-36"
-              title="To"
-            />
-            {(startDate || endDate) && (
-              <button
-                onClick={() => {
-                  const { startDate: sd, endDate: ed } = getCurrentMonthRange();
-                  setStartDate(sd);
-                  setEndDate(ed);
-                  fetchData(statusFilter, tagsFilter, classificationFilter, sd, ed, groupFilter);
-                }}
-                className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200"
-                title="Reset to current month"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
@@ -1283,7 +1184,6 @@ function MicroUnitReport() {
               className="input-field text-sm w-full">
               <option value="">All channels</option>
               <option value="sadhguru">Has Sadhguru videos</option>
-              <option value="non_sadhguru">Has Non Sadhguru videos</option>
             </select>
           </div>
           <div className="sm:col-span-3">
@@ -1435,19 +1335,24 @@ function VideoReport() {
   const channelDebRef = useRef(null);
 
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
   const fetchData = useCallback(async (f, s, p) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
-      const res = await api.get('/export/report/videos', { params });
+      const res = await api.get('/export/report/videos', { params, signal: controller.signal });
       setRows(res.data.data);
       setPagination(res.data.pagination);
       setSummary(res.data.summary ?? null);
-    } catch {
+    } catch (err) {
+      if (err?.code === 'ERR_CANCELED') return;
       toast.error('Failed to load video report');
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, []);
 
@@ -1640,7 +1545,6 @@ function VideoReport() {
             <select value={filters.classification} onChange={(e) => handleFilterChange('classification', e.target.value)} className="input-field text-sm w-full">
               <option value="">All</option>
               <option value="sadhguru">Sadhguru</option>
-              <option value="non_sadhguru">Non Sadhguru</option>
             </select>
           </div>
 
@@ -1666,12 +1570,13 @@ function VideoReport() {
 
           <div className="col-span-2">
             <label className="block text-xs text-dark-400 mb-2">Published Date Range</label>
-            <DateRangeFilter
+            <DateRangePicker
               startDate={filters.startDate}
               endDate={filters.endDate}
-              onStartDate={(v) => handleFilterChange('startDate', v)}
-              onEndDate={(v) => handleFilterChange('endDate', v)}
-              onClear={() => { handleFilterChange('startDate', ''); handleFilterChange('endDate', ''); }}
+              onChange={({ startDate, endDate }) => {
+                handleFilterChange('startDate', startDate);
+                handleFilterChange('endDate', endDate);
+              }}
             />
           </div>
 
