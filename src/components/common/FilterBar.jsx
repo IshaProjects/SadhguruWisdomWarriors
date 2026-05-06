@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Filter, X, Calendar } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useCategories } from '../../hooks/useCategories.js';
+import DateRangePicker from './DateRangePicker.jsx';
 
 const periods = [
   { value: '7d', label: '7D' },
@@ -11,7 +12,7 @@ const periods = [
 
 const statuses = ['All', 'active', 'paused', 'archived'];
 
-export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false, showGroupFilter = false }) {
+export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false, showGroupFilter = false, showAdvancedFilters = true }) {
   const [showFilters, setShowFilters] = useState(false);
   const { categories: dbCategories, loading: catsLoading } = useCategories();
   const categories = ['All', ...dbCategories];
@@ -24,10 +25,6 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
       next.endDate = '';
     }
     onFilterChange(next);
-  };
-
-  const clearDateRange = () => {
-    onFilterChange({ ...filters, startDate: '', endDate: '' });
   };
 
   const isPeriodActive = (periodValue) =>
@@ -84,49 +81,30 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
         )}
 
         {showDateRange && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Calendar className="w-4 h-4 text-dark-400 shrink-0" />
-            <input
-              type="date"
-              value={filters.startDate || ''}
-              onChange={(e) => updateFilter('startDate', e.target.value)}
-              className="input-field text-sm py-1.5 w-40"
-              max={filters.endDate || undefined}
-            />
-            <span className="text-dark-500 text-sm">to</span>
-            <input
-              type="date"
-              value={filters.endDate || ''}
-              onChange={(e) => updateFilter('endDate', e.target.value)}
-              className="input-field text-sm py-1.5 w-40"
-              min={filters.startDate || undefined}
-            />
-            {(filters.startDate || filters.endDate) && (
-              <button
-                type="button"
-                onClick={clearDateRange}
-                className="btn-ghost text-xs p-1.5 text-dark-400 hover:text-dark-200"
-                title="Clear date range"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <DateRangePicker
+            startDate={filters.startDate || ''}
+            endDate={filters.endDate || ''}
+            onChange={({ startDate, endDate }) =>
+              onFilterChange({ ...filters, startDate, endDate })
+            }
+          />
         )}
 
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={clsx(
-            'btn-ghost flex items-center gap-2 text-sm',
-            showFilters && 'bg-dark-800 text-dark-100'
-          )}
-        >
-          <Filter className="w-4 h-4" />
-          Filters
-        </button>
+        {showAdvancedFilters && (
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={clsx(
+              'btn-ghost flex items-center gap-2 text-sm',
+              showFilters && 'bg-dark-800 text-dark-100'
+            )}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+          </button>
+        )}
 
         {/* Active filter tags */}
-        {Object.entries(filters).map(([key, value]) => {
+        {showAdvancedFilters && Object.entries(filters).map(([key, value]) => {
           if (key === 'period' || key === 'startDate' || key === 'endDate' || key === 'group') return null;
           const str = typeof value === 'string' ? value.trim() : value;
           if (!str) return null;
@@ -144,7 +122,7 @@ export default function FilterBar({ filters, onFilterChange, showPeriod = true, 
         })}
       </div>
 
-      {showFilters && (
+      {showAdvancedFilters && showFilters && (
         <div className="flex items-center gap-4 p-3 glass-card">
           <div>
             <label className="text-xs text-dark-400 block mb-1">Category</label>
