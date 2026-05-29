@@ -1145,7 +1145,7 @@ export default function ChannelDetailPage() {
                     </p>
                     <p className="flex justify-between">
                       <span className="text-dark-400">→ -</span>
-                      <span className="font-medium">{classificationSummary.nonSadguruCount}</span>
+                      <span className="font-medium">{classificationSummary.nonSadhguruCount}</span>
                     </p>
                   </>
                 )}
