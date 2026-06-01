@@ -3,6 +3,7 @@ import { Send, Bot, User, Zap, FileText, TrendingUp, SearchX, Loader2, MessageSq
 import clsx from 'clsx';
 import api from '../../services/api.js';
 
+
 // ── quick action buttons ──────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
