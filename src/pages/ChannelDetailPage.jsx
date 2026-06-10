@@ -352,6 +352,7 @@ export default function ChannelDetailPage() {
                   'badge',
                   channel.status === 'active' && 'badge-active',
                   channel.status === 'paused' && 'badge-paused',
+                  channel.status === 'inactive' && 'badge-inactive',
                   channel.status === 'archived' && 'badge-archived',
                 )}>
                   {channel.status}
@@ -605,6 +606,7 @@ export default function ChannelDetailPage() {
                 >
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
+                  <option value="inactive">Inactive</option>
                   <option value="archived">Archived</option>
                 </select>
               </div>

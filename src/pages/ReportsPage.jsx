@@ -312,6 +312,7 @@ function ChannelReport() {
               <option value="">All</option>
               <option value="active">Active</option>
               <option value="paused">Paused</option>
+              <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>
             </select>
           </div>
@@ -429,6 +430,7 @@ function ChannelReport() {
                     <span className={`badge text-xs capitalize ${
                       r.status === 'active'   ? 'bg-green-500/20 text-green-400' :
                       r.status === 'paused'   ? 'bg-yellow-500/20 text-yellow-400' :
+                      r.status === 'inactive' ? 'bg-blue-500/20 text-blue-400' :
                                                 'bg-dark-600 text-dark-400'
                     }`}>{r.status}</span>
                   </td>
@@ -761,6 +763,7 @@ function CategoryReport() {
               <option value="">All (excl. archived)</option>
               <option value="active">Active</option>
               <option value="paused">Paused</option>
+              <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>
             </select>
           </div>
@@ -1167,6 +1170,7 @@ function MicroUnitReport() {
               <option value="">All (excl. archived)</option>
               <option value="active">Active</option>
               <option value="paused">Paused</option>
+              <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>
             </select>
           </div>
@@ -1536,6 +1540,7 @@ function VideoReport() {
               <option value="">All</option>
               <option value="active">Active</option>
               <option value="paused">Paused</option>
+              <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>
             </select>
           </div>

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 const statusColors = {
   active: 'bg-success/20 text-success',
   paused: 'bg-warning/20 text-warning',
+  inactive: 'bg-blue-500/20 text-blue-400',
   archived: 'bg-dark-600/20 text-dark-400',
 };
 
