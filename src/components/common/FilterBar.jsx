@@ -10,7 +10,7 @@ const periods = [
   { value: '90d', label: '90D' },
 ];
 
-const statuses = ['All', 'active', 'paused', 'archived'];
+const statuses = ['All', 'active', 'paused', 'inactive', 'archived'];
 
 export default function FilterBar({ filters, onFilterChange, showPeriod = true, showDateRange = false, showGroupFilter = false, showAdvancedFilters = true }) {
   const [showFilters, setShowFilters] = useState(false);

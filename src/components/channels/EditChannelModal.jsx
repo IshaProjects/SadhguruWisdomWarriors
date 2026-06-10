@@ -107,6 +107,7 @@ export default function EditChannelModal({ channel, open, onClose, onSaved }) {
             >
               <option value="active">Active</option>
               <option value="paused">Paused</option>
+              <option value="inactive">Inactive</option>
               <option value="archived">Archived</option>
             </select>
           </div>

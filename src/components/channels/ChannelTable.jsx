@@ -6,6 +6,7 @@ import clsx from 'clsx';
 const statusBadge = {
   active:   'badge-active',
   paused:   'badge-paused',
+  inactive: 'badge-inactive',
   archived: 'badge-archived',
 };
 
