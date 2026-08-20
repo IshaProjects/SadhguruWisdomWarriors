@@ -12,6 +12,8 @@ import {
   Users,
   SunMoon,
   Folder,
+  UserCheck,
+  AlertTriangle,
 } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -125,48 +127,34 @@ function GeneralTab({ user, isDark, toggleTheme }) {
 ═══════════════════════════════════════════════════════════════════ */
 function TeamTab({ user, canPerformAction, isAdmin }) {
   const [team, setTeam] = useState([]);
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', password: '', role: 'poc' });
+  const [pendingRoles, setPendingRoles] = useState({});
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', password: '', role: 'viewer' });
   const [showInvite, setShowInvite]   = useState(false);
   const [loading, setLoading]         = useState(false);
   const [editingMember, setEditingMember] = useState(null);
-  const [editForm, setEditForm]       = useState({ name: '', email: '', role: 'poc' });
+  const [editForm, setEditForm]       = useState({ name: '', email: '', role: 'viewer' });
   const [editLoading, setEditLoading] = useState(false);
   const [deletingMember, setDeletingMember] = useState(null);
-  const [pendingRoles, setPendingRoles] = useState({});
-
-  const fetchTeam = () => {
-    api.get('/auth/team').then((res) => setTeam(res.data)).catch(() => {});
-  };
 
   useEffect(() => {
-    fetchTeam();
+    api.get('/auth/team').then((res) => setTeam(res.data)).catch(() => {});
   }, []);
 
   const getMemberId = (m) => m._id || m.id;
 
-  const handleInvite = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await api.post('/auth/invite', inviteForm);
-      setTeam([...team, res.data]);
-      setInviteForm({ name: '', email: '', password: '', role: 'poc' });
-      setShowInvite(false);
-      toast.success('Team member added');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add member');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const pendingMembers = team.filter((m) => m.approved === false);
+  const approvedMembers = team.filter((m) => m.approved !== false);
 
   const handleApprove = async (member) => {
     const id = getMemberId(member);
-    const role = pendingRoles[id] || 'poc';
+    const roleToAssign = pendingRoles[id] || member.role || 'poc';
     try {
-      const res = await api.put(`/auth/team/${id}`, { status: 'approved', role });
+      const res = await api.put(`/auth/team/${id}`, {
+        approved: true,
+        role: roleToAssign,
+      });
       setTeam(team.map((m) => (getMemberId(m) === id ? res.data : m)));
-      toast.success(`Approved ${member.name} as ${role.toUpperCase()}`);
+      toast.success(`Approved ${member.name} as ${roleToAssign.toUpperCase()}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to approve user');
     }
@@ -183,9 +171,25 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
     }
   };
 
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/invite', inviteForm);
+      setTeam([...team, res.data]);
+      setInviteForm({ name: '', email: '', password: '', role: 'viewer' });
+      setShowInvite(false);
+      toast.success('Team member added');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add member');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openEdit = (member) => {
     setEditingMember(member);
-    setEditForm({ name: member.name, email: member.email, role: member.role || 'viewer' });
+    setEditForm({ name: member.name, email: member.email, role: member.role });
   };
 
   const handleEditSave = async (e) => {
@@ -220,173 +224,179 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
   const roleIcon = {
     admin:   <Shield className="w-4 h-4 text-accent-400" />,
     manager: <Shield className="w-4 h-4 text-warning" />,
-    poc:     <User   className="w-4 h-4 text-accent-300" />,
     viewer:  <User   className="w-4 h-4 text-dark-400" />,
+    poc:     <UserCheck className="w-4 h-4 text-emerald-400" />,
   };
-
-  const pendingMembers = team.filter((m) => m.status === 'pending');
-  const approvedMembers = team.filter((m) => m.status !== 'pending');
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Pending Approvals Section */}
-        {isAdmin && pendingMembers.length > 0 && (
-          <div className="glass-card p-6 border-amber-500/30">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-              <h3 className="font-semibold text-dark-100">Pending User Approvals ({pendingMembers.length})</h3>
-            </div>
-            <div className="space-y-3">
-              {pendingMembers.map((member) => {
-                const id = getMemberId(member);
-                const selectedRole = pendingRoles[id] || 'poc';
-                return (
-                  <div key={id} className="flex items-center justify-between p-3 rounded-lg bg-dark-800/80 border border-dark-700/60 flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-medium text-sm">
-                        {member.name?.[0]?.toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-dark-100">{member.name}</p>
-                        <p className="text-xs text-dark-400">{member.email}</p>
-                      </div>
+      {/* ── Pending User Approvals (Amber Box for Admins) ── */}
+      {isAdmin && pendingMembers.length > 0 && (
+        <div className="glass-card p-5 border border-amber-500/40 bg-amber-500/10 mb-6 rounded-xl animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <h3 className="font-semibold text-amber-300">
+              Pending User Approvals ({pendingMembers.length})
+            </h3>
+          </div>
+          <p className="text-xs text-dark-300 mb-4">
+            The following new users have registered and are waiting for Admin approval and role assignment.
+          </p>
+          <div className="space-y-3">
+            {pendingMembers.map((member) => {
+              const id = getMemberId(member);
+              const currentRole = pendingRoles[id] || member.role || 'poc';
+              return (
+                <div
+                  key={id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg bg-dark-900/80 border border-dark-700/80 gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-medium text-sm">
+                      {member.name?.[0]?.toUpperCase()}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <select
-                        value={selectedRole}
-                        onChange={(e) => setPendingRoles({ ...pendingRoles, [id]: e.target.value })}
-                        className="input-field text-xs py-1.5 px-2 bg-dark-900 border-dark-700"
-                      >
-                        <option value="poc">Role: POC</option>
-                        <option value="viewer">Role: Viewer</option>
-                        <option value="manager">Role: Manager</option>
-                        <option value="admin">Role: Admin</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(member)}
-                        className="btn-primary text-xs py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white"
-                      >
-                        ✓ Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleReject(member)}
-                        className="btn-secondary text-xs py-1.5 px-3 hover:bg-red-500/20 text-red-400"
-                      >
-                        ✕ Reject
-                      </button>
+                    <div>
+                      <p className="text-sm font-medium text-dark-100">{member.name}</p>
+                      <p className="text-xs text-dark-400">{member.email}</p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <select
+                      value={currentRole}
+                      onChange={(e) =>
+                        setPendingRoles({ ...pendingRoles, [id]: e.target.value })
+                      }
+                      className="input-field text-xs py-1.5 px-2.5 bg-dark-800 border-dark-600 font-medium"
+                    >
+                      <option value="poc">POC</option>
+                      <option value="viewer">Viewer</option>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(member)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReject(member)}
+                      className="px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                    >
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Team Members</h3>
+          {canPerformAction('team.invite') && (
+            <button onClick={() => setShowInvite(!showInvite)} className="btn-primary text-sm flex items-center gap-1.5">
+              <UserPlus className="w-4 h-4" /> Add Member
+            </button>
+          )}
+        </div>
+
+        {showInvite && (
+          <form onSubmit={handleInvite} className="mb-6 p-4 bg-dark-800 rounded-lg space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <input type="text"     placeholder="Name"     value={inviteForm.name}     onChange={(e) => setInviteForm({ ...inviteForm, name:     e.target.value })} className="input-field text-sm" required />
+              <input type="email"    placeholder="Email"    value={inviteForm.email}    onChange={(e) => setInviteForm({ ...inviteForm, email:    e.target.value })} className="input-field text-sm" required />
+              <input type="password" placeholder="Password" value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} className="input-field text-sm" required />
+              <select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} className="input-field text-sm">
+                <option value="poc">POC</option>
+                <option value="viewer">Viewer</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowInvite(false)} className="btn-secondary text-sm flex-1">Cancel</button>
+              <button type="submit"  disabled={loading} className="btn-primary text-sm flex-1 disabled:opacity-50">{loading ? 'Adding...' : 'Add Team Member'}</button>
+            </div>
+          </form>
         )}
 
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Team Members</h3>
-            {canPerformAction('team.invite') && (
-              <button onClick={() => setShowInvite(!showInvite)} className="btn-primary text-sm flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4" /> Add Member
-              </button>
-            )}
-          </div>
+        <div className="space-y-2">
+          {approvedMembers.map((member) => (
+            <div key={getMemberId(member)} className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-800 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center text-sm font-medium">
+                  {member.name?.[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{member.name}</p>
+                  <p className="text-xs text-dark-400">{member.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {roleIcon[member.role] || roleIcon.viewer}
+                <span className="text-sm text-dark-300 uppercase text-xs font-semibold px-2 py-0.5 rounded bg-dark-800">{member.role}</span>
+                {isAdmin && getMemberId(member) !== user?.id && (
+                  <>
+                    <button type="button" onClick={() => openEdit(member)} className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200 ml-2" aria-label="Edit member">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" onClick={() => setDeletingMember(member)} className="p-1.5 rounded hover:bg-dark-800 text-red-400 hover:text-red-300" aria-label="Delete member">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {approvedMembers.length === 0 && <p className="text-sm text-dark-400 text-center py-4">No team members found.</p>}
+        </div>
+      </div>
 
-          {showInvite && (
-            <form onSubmit={handleInvite} className="mb-6 p-4 bg-dark-800 rounded-lg space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text"     placeholder="Name"     value={inviteForm.name}     onChange={(e) => setInviteForm({ ...inviteForm, name:     e.target.value })} className="input-field text-sm" required />
-                <input type="email"    placeholder="Email"    value={inviteForm.email}    onChange={(e) => setInviteForm({ ...inviteForm, email:    e.target.value })} className="input-field text-sm" required />
-                <input type="password" placeholder="Password" value={inviteForm.password} onChange={(e) => setInviteForm({ ...inviteForm, password: e.target.value })} className="input-field text-sm" required />
-                <select value={inviteForm.role} onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })} className="input-field text-sm">
+      {/* Edit Member Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-semibold">Edit Team Member</h2>
+                <p className="text-xs text-dark-400">{editingMember.email}</p>
+              </div>
+              <button onClick={() => setEditingMember(null)} className="p-1 hover:bg-dark-800 rounded">
+                <X className="w-5 h-5 text-dark-400" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSave} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1">Name</label>
+                <input type="text"  value={editForm.name}  onChange={(e) => setEditForm({ ...editForm, name:  e.target.value })} className="input-field w-full" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1">Email</label>
+                <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="input-field w-full" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-300 mb-1">Role</label>
+                <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="input-field w-full">
                   <option value="poc">POC</option>
                   <option value="viewer">Viewer</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowInvite(false)} className="btn-secondary text-sm flex-1">Cancel</button>
-                <button type="submit"  disabled={loading} className="btn-primary text-sm flex-1 disabled:opacity-50">{loading ? 'Adding...' : 'Add Team Member'}</button>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditingMember(null)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={editLoading} className="btn-primary flex-1 disabled:opacity-50">{editLoading ? 'Saving...' : 'Save Changes'}</button>
               </div>
             </form>
-          )}
-
-          <div className="space-y-2">
-            {approvedMembers.map((member) => (
-              <div key={getMemberId(member)} className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-800 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-dark-700 flex items-center justify-center text-sm font-medium">
-                    {member.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{member.name}</p>
-                    <p className="text-xs text-dark-400">{member.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {roleIcon[member.role] || roleIcon['viewer']}
-                  <span className="text-sm text-dark-300 capitalize">{member.role}</span>
-                  {isAdmin && getMemberId(member) !== user?.id && (
-                    <>
-                      <button type="button" onClick={() => openEdit(member)} className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-dark-200 ml-2" aria-label="Edit member">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button type="button" onClick={() => setDeletingMember(member)} className="p-1.5 rounded hover:bg-dark-800 text-red-400 hover:text-red-300" aria-label="Delete member">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-            {approvedMembers.length === 0 && <p className="text-sm text-dark-400 text-center py-4">No team members found.</p>}
           </div>
         </div>
-
-        {/* Edit Member Modal */}
-        {editingMember && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="glass-card w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h2 className="text-lg font-semibold">Edit Team Member</h2>
-                  <p className="text-xs text-dark-400">{editingMember.email}</p>
-                </div>
-                <button onClick={() => setEditingMember(null)} className="p-1 hover:bg-dark-800 rounded">
-                  <X className="w-5 h-5 text-dark-400" />
-                </button>
-              </div>
-              <form onSubmit={handleEditSave} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-dark-300 mb-1">Name</label>
-                  <input type="text"  value={editForm.name}  onChange={(e) => setEditForm({ ...editForm, name:  e.target.value })} className="input-field w-full" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-dark-300 mb-1">Email</label>
-                  <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="input-field w-full" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-dark-300 mb-1">Role</label>
-                  <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="input-field w-full">
-                    <option value="poc">POC</option>
-                    <option value="viewer">Viewer</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setEditingMember(null)} className="btn-secondary flex-1">Cancel</button>
-                  <button type="submit" disabled={editLoading} className="btn-primary flex-1 disabled:opacity-50">{editLoading ? 'Saving...' : 'Save Changes'}</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deletingMember && (
