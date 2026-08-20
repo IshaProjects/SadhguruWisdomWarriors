@@ -9,7 +9,7 @@ import api from '../services/api.js';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-const ROLES = ['admin', 'manager', 'viewer'];
+const ROLES = ['admin', 'manager', 'poc', 'viewer'];
 
 function PermissionTable({ title, icon: Icon, description, entries, onChange, saving }) {
   const toggle = (idx, role) => {
