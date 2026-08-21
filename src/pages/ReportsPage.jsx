@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
   ChevronsUpDown, RefreshCw, Tv2, Video, Tag, Layers,
@@ -69,12 +70,63 @@ function Pagination({ page, pages, total, limit, onPage }) {
    Main Page
 ═══════════════════════════════════════════════════════════════════ */
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState('categories');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const microUnitId = searchParams.get('microUnitId');
+  const tabParam = searchParams.get('tab');
+
+  const [activeTab, setActiveTab] = useState(tabParam || (microUnitId ? 'channels' : 'categories'));
+  const [selectedMicroUnit, setSelectedMicroUnit] = useState(null);
+
+  useEffect(() => {
+    if (tabParam) setActiveTab(tabParam);
+    else if (microUnitId) setActiveTab('channels');
+  }, [tabParam, microUnitId]);
+
+  useEffect(() => {
+    if (microUnitId) {
+      api.get(`/micro-units/${microUnitId}`)
+        .then((res) => setSelectedMicroUnit(res.data))
+        .catch(() => setSelectedMicroUnit(null));
+    } else {
+      setSelectedMicroUnit(null);
+    }
+  }, [microUnitId]);
+
+  const clearMicroUnitFilter = () => {
+    setSearchParams({});
+    setSelectedMicroUnit(null);
+  };
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Reports" />
+      <TopBar title={selectedMicroUnit ? `Unit Dashboard: ${selectedMicroUnit.name}` : "Reports"} />
       <div className="p-6 flex-1 space-y-4">
+        {/* Micro Unit Dashboard Banner */}
+        {selectedMicroUnit && (
+          <div className="glass-card p-4 border border-accent-500/40 bg-accent-500/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-accent-500/20 text-accent-400">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-accent-300 text-base">
+                  Micro Unit Dashboard: {selectedMicroUnit.name}
+                </h3>
+                <p className="text-xs text-dark-300">
+                  Filtering reports for {selectedMicroUnit.channelIds?.length || 0} assigned channels
+                  {selectedMicroUnit.poc ? ` • Point of Contact: ${selectedMicroUnit.poc.name}` : ' • POC: Unassigned'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={clearMicroUnitFilter}
+              className="btn-secondary text-xs flex items-center gap-1.5 self-end sm:self-auto"
+            >
+              <X className="w-3.5 h-3.5" /> Clear Unit Filter (View All)
+            </button>
+          </div>
+        )}
+
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-dark-700">
           {[
@@ -98,10 +150,10 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {activeTab === 'channels'     && <ChannelReport    />}
-        {activeTab === 'videos'       && <VideoReport      />}
-        {activeTab === 'categories'   && <CategoryReport   />}
-        {activeTab === 'micro-units'  && <MicroUnitReport   />}
+        {activeTab === 'channels'     && <ChannelReport microUnitId={microUnitId} />}
+        {activeTab === 'videos'       && <VideoReport microUnitId={microUnitId} />}
+        {activeTab === 'categories'   && <CategoryReport />}
+        {activeTab === 'micro-units'  && <MicroUnitReport />}
       </div>
     </div>
   );
@@ -110,7 +162,7 @@ export default function ReportsPage() {
 /* ═══════════════════════════════════════════════════════════════════
    Channel Report Tab
 ═══════════════════════════════════════════════════════════════════ */
-function ChannelReport() {
+function ChannelReport({ microUnitId }) {
   const { categories } = useCategories();
   const monthRange = getCurrentMonthRange();
 
@@ -141,6 +193,7 @@ function ChannelReport() {
     setLoading(true);
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
+      if (microUnitId) params.microUnitId = microUnitId;
       // map sort key back to mongo/row field name (period fields pass through as-is)
       const isPeriodSort = ['views_in_period', 'subscribers_in_period', 'videos_in_period'].includes(s.replace(/^[-+]/, ''));
       params.sort = isPeriodSort ? s : s.replace('subscribers', 'currentStats.subscribers')
@@ -156,7 +209,7 @@ function ChannelReport() {
     } finally {
       if (abortRef.current === controller) setLoading(false);
     }
-  }, []);
+  }, [microUnitId]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -197,6 +250,7 @@ function ChannelReport() {
     setExporting(format);
     try {
       const params = { ...filters, sort, format };
+      if (microUnitId) params.microUnitId = microUnitId;
       const isPeriodSort = ['views_in_period', 'subscribers_in_period'].includes(sort.replace(/^[-+]/, ''));
       params.sort = isPeriodSort ? sort : sort.replace('subscribers', 'currentStats.subscribers')
                                                .replace('total_views', 'currentStats.views')
@@ -1313,7 +1367,7 @@ function MicroUnitReport() {
 /* ═══════════════════════════════════════════════════════════════════
    Video Report Tab
 ═══════════════════════════════════════════════════════════════════ */
-function VideoReport() {
+function VideoReport({ microUnitId }) {
   const { categories } = useCategories();
 
   const [filters, setFilters] = useState({
@@ -1348,6 +1402,7 @@ function VideoReport() {
     setLoading(true);
     try {
       const params = { ...f, sort: s, page: p, limit: LIMIT, format: 'json' };
+      if (microUnitId) params.microUnitId = microUnitId;
       const res = await api.get('/export/report/videos', { params, signal: controller.signal });
       setRows(res.data.data);
       setPagination(res.data.pagination);
@@ -1358,7 +1413,7 @@ function VideoReport() {
     } finally {
       if (abortRef.current === controller) setLoading(false);
     }
-  }, []);
+  }, [microUnitId]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -1415,8 +1470,10 @@ function VideoReport() {
   const handleExport = async (format) => {
     setExporting(format);
     try {
+      const params = { ...filters, sort, format };
+      if (microUnitId) params.microUnitId = microUnitId;
       const res = await api.get('/export/report/videos', {
-        params: { ...filters, sort, format },
+        params,
         responseType: 'blob',
       });
       const ext  = format === 'excel' ? 'xlsx' : 'csv';

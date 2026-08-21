@@ -173,7 +173,7 @@ export default function MicroUnitsPage() {
 
                 {/* ── View Unit Dashboard Button ── */}
                 <button
-                  onClick={() => navigate(`/dashboard?microUnitId=${unit._id}`)}
+                  onClick={() => navigate(`/reports?microUnitId=${unit._id}&tab=channels`)}
                   className="w-full mt-4 btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 hover:bg-accent-500/10 hover:border-accent-500/30 transition-all"
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
