@@ -114,17 +114,19 @@ export default function DashboardPage() {
           <div className="glass-card p-5 border border-accent-500/30 bg-dark-900/60 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigate('/micro-units')}
-                  className="p-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-300 hover:text-dark-100 transition-colors"
-                  title="Back to Micro Units"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
+                {isManagerOrAdmin && (
+                  <button
+                    onClick={() => navigate('/micro-units')}
+                    className="p-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-300 hover:text-dark-100 transition-colors"
+                    title="Back to Micro Units"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                )}
                 <Layers className="w-5 h-5 text-accent-400" />
                 <h2 className="text-xl font-bold text-dark-100">{unit?.name || 'Loading Micro Unit...'}</h2>
               </div>
-              <p className="text-xs text-dark-400 flex items-center gap-3 pl-8">
+              <p className={`text-xs text-dark-400 flex items-center gap-3 ${isManagerOrAdmin ? 'pl-8' : 'pl-7'}`}>
                 <span>{unit?.channelIds?.length || 0} Added Channels</span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
