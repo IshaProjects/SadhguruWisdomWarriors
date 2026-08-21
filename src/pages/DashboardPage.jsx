@@ -186,8 +186,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Unit Filtered Reports */}
-          {activeTab === 'channels' && <ChannelReport microUnitId={microUnitId} />}
-          {activeTab === 'videos' && <VideoReport microUnitId={microUnitId} />}
+          {activeTab === 'channels' && <ChannelReport microUnitId={currentUnitId} />}
+          {activeTab === 'videos' && <VideoReport microUnitId={currentUnitId} />}
         </div>
       </div>
     );
