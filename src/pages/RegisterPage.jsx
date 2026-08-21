@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Youtube } from 'lucide-react';
+import { Youtube, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
@@ -9,6 +9,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -20,15 +22,42 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(name, email, password);
-      toast.success('Account created!');
-      navigate('/dashboard');
+      const data = await register(name, email, password);
+      if (data?.pending || data?.user?.status === 'pending') {
+        setIsPending(true);
+      } else {
+        toast.success('Account created!');
+        navigate('/dashboard');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-md glass-card p-8 text-center space-y-5">
+          <div className="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/30">
+            <Clock className="w-7 h-7" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-dark-100">Registration Submitted!</h2>
+            <p className="text-sm text-dark-300 leading-relaxed">
+              Your registration has been received. <strong>Once an admin approves your request, you will get access to the platform.</strong>
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link to="/login" className="btn-primary w-full inline-block text-center py-2.5 text-sm font-medium">
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
