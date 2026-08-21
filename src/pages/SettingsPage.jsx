@@ -147,7 +147,8 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
 
   const handleApprove = async (member) => {
     const id = getMemberId(member);
-    const roleToAssign = pendingRoles[id] || member.role || 'poc';
+    const rawRole = pendingRoles[id] || member.role || 'poc';
+    const roleToAssign = String(rawRole).trim().toLowerCase();
     try {
       const res = await api.put(`/auth/team/${id}`, {
         approved: true,
@@ -175,7 +176,11 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post('/auth/invite', inviteForm);
+      const sanitizedRole = String(inviteForm.role || 'viewer').trim().toLowerCase();
+      const res = await api.post('/auth/invite', {
+        ...inviteForm,
+        role: sanitizedRole,
+      });
       setTeam([...team, res.data]);
       setInviteForm({ name: '', email: '', password: '', role: 'viewer' });
       setShowInvite(false);
@@ -197,7 +202,11 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
     setEditLoading(true);
     try {
       const id = getMemberId(editingMember);
-      const res = await api.put(`/auth/team/${id}`, editForm);
+      const sanitizedRole = String(editForm.role || 'viewer').trim().toLowerCase();
+      const res = await api.put(`/auth/team/${id}`, {
+        ...editForm,
+        role: sanitizedRole,
+      });
       setTeam(team.map((m) => (getMemberId(m) === id ? res.data : m)));
       setEditingMember(null);
       toast.success('Team member updated');
