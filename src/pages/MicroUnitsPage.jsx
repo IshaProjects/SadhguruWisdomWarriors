@@ -298,20 +298,34 @@ function AssignPocModal({ unit, onClose, onSaved }) {
             </label>
             {loadingTeam ? (
               <p className="text-xs text-dark-400 py-2">Loading team members...</p>
-            ) : (
-              <select
-                value={selectedPocId}
-                onChange={(e) => setSelectedPocId(e.target.value)}
-                className="input-field w-full text-sm"
-              >
-                <option value="">-- Unassigned --</option>
-                {team.map((member) => (
-                  <option key={member._id || member.id} value={member._id || member.id}>
-                    {member.name} ({member.email}) - {member.role?.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            )}
+            ) : (() => {
+              const pocMembers = team.filter(
+                (m) => String(m.role).toLowerCase() === 'poc'
+              );
+
+              if (pocMembers.length === 0) {
+                return (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+                    No team members currently have the <strong>POC</strong> role. You can assign the POC role to team members in <strong>Settings ➔ Team</strong>.
+                  </div>
+                );
+              }
+
+              return (
+                <select
+                  value={selectedPocId}
+                  onChange={(e) => setSelectedPocId(e.target.value)}
+                  className="input-field w-full text-sm"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {pocMembers.map((member) => (
+                    <option key={member._id || member.id} value={member._id || member.id}>
+                      {member.name} ({member.email})
+                    </option>
+                  ))}
+                </select>
+              );
+            })()}
           </div>
 
           <div className="flex gap-3 pt-2 justify-end">
