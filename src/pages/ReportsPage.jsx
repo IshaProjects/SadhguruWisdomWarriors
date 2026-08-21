@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
   FileSpreadsheet, FileText, Search, Filter, X, ChevronUp, ChevronDown,
   ChevronsUpDown, RefreshCw, Tv2, Video, Tag, Layers,
@@ -70,63 +69,12 @@ function Pagination({ page, pages, total, limit, onPage }) {
    Main Page
 ═══════════════════════════════════════════════════════════════════ */
 export default function ReportsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const microUnitId = searchParams.get('microUnitId');
-  const tabParam = searchParams.get('tab');
-
-  const [activeTab, setActiveTab] = useState(tabParam || (microUnitId ? 'channels' : 'categories'));
-  const [selectedMicroUnit, setSelectedMicroUnit] = useState(null);
-
-  useEffect(() => {
-    if (tabParam) setActiveTab(tabParam);
-    else if (microUnitId) setActiveTab('channels');
-  }, [tabParam, microUnitId]);
-
-  useEffect(() => {
-    if (microUnitId) {
-      api.get(`/micro-units/${microUnitId}`)
-        .then((res) => setSelectedMicroUnit(res.data))
-        .catch(() => setSelectedMicroUnit(null));
-    } else {
-      setSelectedMicroUnit(null);
-    }
-  }, [microUnitId]);
-
-  const clearMicroUnitFilter = () => {
-    setSearchParams({});
-    setSelectedMicroUnit(null);
-  };
+  const [activeTab, setActiveTab] = useState('categories');
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title={selectedMicroUnit ? `Unit Dashboard: ${selectedMicroUnit.name}` : "Reports"} />
+      <TopBar title="Reports" />
       <div className="p-6 flex-1 space-y-4">
-        {/* Micro Unit Dashboard Banner */}
-        {selectedMicroUnit && (
-          <div className="glass-card p-4 border border-accent-500/40 bg-accent-500/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-accent-500/20 text-accent-400">
-                <Layers className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-accent-300 text-base">
-                  Micro Unit Dashboard: {selectedMicroUnit.name}
-                </h3>
-                <p className="text-xs text-dark-300">
-                  Filtering reports for {selectedMicroUnit.channelIds?.length || 0} assigned channels
-                  {selectedMicroUnit.poc ? ` • Point of Contact: ${selectedMicroUnit.poc.name}` : ' • POC: Unassigned'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={clearMicroUnitFilter}
-              className="btn-secondary text-xs flex items-center gap-1.5 self-end sm:self-auto"
-            >
-              <X className="w-3.5 h-3.5" /> Clear Unit Filter (View All)
-            </button>
-          </div>
-        )}
-
         {/* Tab bar */}
         <div className="flex gap-1 border-b border-dark-700">
           {[
@@ -150,10 +98,10 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {activeTab === 'channels'     && <ChannelReport microUnitId={microUnitId} />}
-        {activeTab === 'videos'       && <VideoReport microUnitId={microUnitId} />}
-        {activeTab === 'categories'   && <CategoryReport />}
-        {activeTab === 'micro-units'  && <MicroUnitReport />}
+        {activeTab === 'channels'     && <ChannelReport    />}
+        {activeTab === 'videos'       && <VideoReport      />}
+        {activeTab === 'categories'   && <CategoryReport   />}
+        {activeTab === 'micro-units'  && <MicroUnitReport   />}
       </div>
     </div>
   );
@@ -162,7 +110,7 @@ export default function ReportsPage() {
 /* ═══════════════════════════════════════════════════════════════════
    Channel Report Tab
 ═══════════════════════════════════════════════════════════════════ */
-function ChannelReport({ microUnitId }) {
+export function ChannelReport({ microUnitId }) {
   const { categories } = useCategories();
   const monthRange = getCurrentMonthRange();
 
@@ -1367,7 +1315,7 @@ function MicroUnitReport() {
 /* ═══════════════════════════════════════════════════════════════════
    Video Report Tab
 ═══════════════════════════════════════════════════════════════════ */
-function VideoReport({ microUnitId }) {
+export function VideoReport({ microUnitId }) {
   const { categories } = useCategories();
 
   const [filters, setFilters] = useState({

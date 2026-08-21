@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Tv2, Video, Layers, User, ArrowLeft } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import FilterBar from '../components/common/FilterBar.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
 import GradeGrid from '../components/dashboard/GradeGrid.jsx';
+import { ChannelReport, VideoReport } from './ReportsPage.jsx';
 import api from '../services/api.js';
 
 export default function DashboardPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const microUnitId = searchParams.get('microUnitId');
+
+  const [unit, setUnit] = useState(null);
+  const [loadingUnit, setLoadingUnit] = useState(false);
+  const [activeTab, setActiveTab] = useState('channels');
+
   const [filters, setFilters] = useState({
     group: '',
     startDate: '',
@@ -15,7 +26,21 @@ export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch Micro Unit details if viewing a unit's dashboard
   useEffect(() => {
+    if (!microUnitId) {
+      setUnit(null);
+      return;
+    }
+    setLoadingUnit(true);
+    api.get(`/micro-units/${microUnitId}`)
+      .then((res) => setUnit(res.data))
+      .catch(() => toast.error('Failed to load Micro Unit details'))
+      .finally(() => setLoadingUnit(false));
+  }, [microUnitId]);
+
+  useEffect(() => {
+    if (microUnitId) return; // Skip grade-grid fetch when viewing specific unit dashboard
     let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
@@ -30,7 +55,6 @@ export default function DashboardPage() {
         if (!cancelled) setData(res.data);
       } catch (err) {
         if (!cancelled) toast.error('Failed to load dashboard');
-        // Keep prior valid data visible on transient failure.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -39,7 +63,72 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, microUnitId]);
+
+  if (microUnitId) {
+    return (
+      <div className="flex flex-col h-full">
+        <TopBar title={unit ? `${unit.name} Dashboard` : 'Unit Dashboard'} />
+        <div className="p-6 flex-1 space-y-5">
+          {/* Header Card for Micro Unit */}
+          <div className="glass-card p-5 border border-accent-500/30 bg-dark-900/60 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate('/micro-units')}
+                  className="p-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-300 hover:text-dark-100 transition-colors"
+                  title="Back to Micro Units"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <Layers className="w-5 h-5 text-accent-400" />
+                <h2 className="text-xl font-bold text-dark-100">{unit?.name || 'Loading Micro Unit...'}</h2>
+              </div>
+              <p className="text-xs text-dark-400 flex items-center gap-3 pl-8">
+                <span>{unit?.channelIds?.length || 0} Added Channels</span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-accent-400" />
+                  POC: <strong className="text-dark-200">{unit?.poc?.name || 'Unassigned'}</strong>
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn-ghost text-xs text-dark-400 hover:text-dark-200"
+            >
+              View Global Dashboard →
+            </button>
+          </div>
+
+          {/* Tab bar for Unit Reports */}
+          <div className="flex gap-1 border-b border-dark-700">
+            {[
+              { id: 'channels', label: 'Channel Report', Icon: Tv2 },
+              { id: 'videos', label: 'Video Report', Icon: Video },
+            ].map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  activeTab === id
+                    ? 'border-accent-500 text-accent-400'
+                    : 'border-transparent text-dark-400 hover:text-dark-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Unit Filtered Reports */}
+          {activeTab === 'channels' && <ChannelReport microUnitId={microUnitId} />}
+          {activeTab === 'videos' && <VideoReport microUnitId={microUnitId} />}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
