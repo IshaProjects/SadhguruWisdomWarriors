@@ -1,4 +1,4 @@
-// Vercel deployment trigger
+// Public repository deployment trigger
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { useRbac } from './context/RbacContext.jsx';
