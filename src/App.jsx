@@ -1,4 +1,4 @@
-// Public repository deployment trigger
+// Fresh build trigger after reconnection
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import { useRbac } from './context/RbacContext.jsx';
