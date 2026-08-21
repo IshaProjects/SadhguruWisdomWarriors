@@ -7,8 +7,11 @@ import api from '../services/api.js';
 import toast from 'react-hot-toast';
 import { formatNumber } from '../utils/formatters.js';
 import clsx from 'clsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function MicroUnitsPage() {
+  const { user } = useAuth();
+  const isManagerOrAdmin = ['admin', 'manager'].includes(user?.role);
   const navigate = useNavigate();
   const [microUnits, setMicroUnits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +57,15 @@ export default function MicroUnitsPage() {
           <p className="text-sm text-dark-400">
             Group channels into micro units for easier management and reporting.
           </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary text-sm flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            New Micro Unit
-          </button>
+          {isManagerOrAdmin && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary text-sm flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              New Micro Unit
+            </button>
+          )}
         </div>
 
         {microUnits.length === 0 ? (
@@ -90,22 +95,24 @@ export default function MicroUnitsPage() {
                     <h3 className="font-semibold text-dark-100 truncate flex-1">
                       {unit.name}
                     </h3>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => setEditingUnit(unit)}
-                        className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-accent-400"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeletingUnit(unit)}
-                        className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-red-400"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {isManagerOrAdmin && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => setEditingUnit(unit)}
+                          className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-accent-400"
+                          aria-label="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingUnit(unit)}
+                          className="p-1.5 rounded hover:bg-dark-700 text-dark-400 hover:text-red-400"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* ── Point of Contact Banner ── */}
@@ -119,13 +126,15 @@ export default function MicroUnitsPage() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setAssigningPocUnit(unit)}
-                      className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-accent-300 font-medium transition-colors shrink-0 flex items-center gap-1"
-                    >
-                      <UserCheck className="w-3 h-3" />
-                      {unit.poc ? 'Reassign POC' : 'Assign POC'}
-                    </button>
+                    {isManagerOrAdmin && (
+                      <button
+                        onClick={() => setAssigningPocUnit(unit)}
+                        className="text-xs px-2 py-1 rounded bg-dark-700 hover:bg-dark-600 text-accent-300 font-medium transition-colors shrink-0 flex items-center gap-1"
+                      >
+                        <UserCheck className="w-3 h-3" />
+                        {unit.poc ? 'Reassign POC' : 'Assign POC'}
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-dark-400 mb-3">
@@ -173,7 +182,7 @@ export default function MicroUnitsPage() {
 
                 {/* ── View Unit Dashboard Button ── */}
                 <button
-                  onClick={() => navigate(`/reports?microUnitId=${unit._id}&tab=channels`)}
+                  onClick={() => navigate(`/dashboard?microUnitId=${unit._id}`)}
                   className="w-full mt-4 btn-secondary text-xs font-medium flex items-center justify-center gap-1.5 py-2 hover:bg-accent-500/10 hover:border-accent-500/30 transition-all"
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />

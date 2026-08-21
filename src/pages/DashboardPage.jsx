@@ -7,13 +7,20 @@ import FilterBar from '../components/common/FilterBar.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
 import GradeGrid from '../components/dashboard/GradeGrid.jsx';
 import { ChannelReport, VideoReport } from './ReportsPage.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.js';
 
 export default function DashboardPage() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const microUnitId = searchParams.get('microUnitId');
+  const { user } = useAuth();
+  const isPoc = user?.role === 'poc';
+  const isManagerOrAdmin = ['admin', 'manager'].includes(user?.role);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const microUnitIdParam = searchParams.get('microUnitId');
+
+  const [pocUnits, setPocUnits] = useState([]);
+  const [selectedUnitId, setSelectedUnitId] = useState(microUnitIdParam || '');
   const [unit, setUnit] = useState(null);
   const [loadingUnit, setLoadingUnit] = useState(false);
   const [activeTab, setActiveTab] = useState('channels');
@@ -26,21 +33,37 @@ export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // For POC users: automatically fetch their assigned micro unit(s)
+  useEffect(() => {
+    if (isPoc) {
+      api.get('/micro-units')
+        .then((res) => {
+          setPocUnits(res.data);
+          if (!microUnitIdParam && res.data.length > 0) {
+            setSelectedUnitId(res.data[0]._id);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isPoc, microUnitIdParam]);
+
+  const currentUnitId = microUnitIdParam || selectedUnitId;
+
   // Fetch Micro Unit details if viewing a unit's dashboard
   useEffect(() => {
-    if (!microUnitId) {
+    if (!currentUnitId) {
       setUnit(null);
       return;
     }
     setLoadingUnit(true);
-    api.get(`/micro-units/${microUnitId}`)
+    api.get(`/micro-units/${currentUnitId}`)
       .then((res) => setUnit(res.data))
       .catch(() => toast.error('Failed to load Micro Unit details'))
       .finally(() => setLoadingUnit(false));
-  }, [microUnitId]);
+  }, [currentUnitId]);
 
   useEffect(() => {
-    if (microUnitId) return; // Skip grade-grid fetch when viewing specific unit dashboard
+    if (currentUnitId) return; // Skip grade-grid fetch when viewing specific unit dashboard
     let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
@@ -63,9 +86,26 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [filters, microUnitId]);
+  }, [filters, currentUnitId]);
 
-  if (microUnitId) {
+  if (currentUnitId || isPoc) {
+    if (isPoc && pocUnits.length === 0 && !loadingUnit && !unit) {
+      return (
+        <div className="flex flex-col h-full">
+          <TopBar title="POC Dashboard" />
+          <div className="p-6">
+            <div className="glass-card p-12 text-center">
+              <Layers className="w-12 h-12 text-dark-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-dark-300 mb-2">No Micro Units Assigned</h3>
+              <p className="text-sm text-dark-400">
+                You currently do not have any Micro Units assigned to your Point of Contact account. Please contact an Admin to assign a unit to you.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col h-full">
         <TopBar title={unit ? `${unit.name} Dashboard` : 'Unit Dashboard'} />
@@ -93,12 +133,35 @@ export default function DashboardPage() {
                 </span>
               </p>
             </div>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="btn-ghost text-xs text-dark-400 hover:text-dark-200"
-            >
-              View Global Dashboard →
-            </button>
+
+            <div className="flex items-center gap-3">
+              {/* If POC has multiple units assigned, show unit selector */}
+              {isPoc && pocUnits.length > 1 && (
+                <select
+                  value={currentUnitId}
+                  onChange={(e) => {
+                    setSelectedUnitId(e.target.value);
+                    setSearchParams({ microUnitId: e.target.value });
+                  }}
+                  className="input-field text-xs py-1.5 px-3 bg-dark-800 border-dark-600 font-medium"
+                >
+                  {pocUnits.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {isManagerOrAdmin && (
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="btn-ghost text-xs text-dark-400 hover:text-dark-200"
+                >
+                  View Global Dashboard →
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Tab bar for Unit Reports */}
