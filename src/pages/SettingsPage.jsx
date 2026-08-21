@@ -142,8 +142,8 @@ function TeamTab({ user, canPerformAction, isAdmin }) {
 
   const getMemberId = (m) => m._id || m.id;
 
-  const pendingMembers = team.filter((m) => m.approved === false);
-  const approvedMembers = team.filter((m) => m.approved !== false);
+  const pendingMembers = team.filter((m) => m.approved === false || m.status === 'pending');
+  const approvedMembers = team.filter((m) => m.approved !== false && m.status !== 'pending');
 
   const handleApprove = async (member) => {
     const id = getMemberId(member);
