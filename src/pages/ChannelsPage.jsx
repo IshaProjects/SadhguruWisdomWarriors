@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X, Sparkles, RotateCw } from 'lucide-react';
+import { Plus, Upload, Download, RefreshCw, LayoutGrid, List, Trash2, X, Sparkles, RotateCw, FileSpreadsheet } from 'lucide-react';
 import TopBar from '../components/layout/TopBar.jsx';
 import ChannelTable from '../components/channels/ChannelTable.jsx';
 import ChannelCard from '../components/channels/ChannelCard.jsx';
 import AddChannelModal from '../components/channels/AddChannelModal.jsx';
 import EditChannelModal from '../components/channels/EditChannelModal.jsx';
+import GoogleSheetSyncModal from '../components/channels/GoogleSheetSyncModal.jsx';
 import FilterBar from '../components/common/FilterBar.jsx';
 import Pagination from '../components/common/Pagination.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
@@ -21,6 +22,7 @@ export default function ChannelsPage() {
   const [loading, setLoading]           = useState(true);
   const [viewMode, setViewMode]         = useState('table');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSheetSyncModal, setShowSheetSyncModal] = useState(false);
   const [editingChannel, setEditingChannel]   = useState(null);
   const [deletingChannel, setDeletingChannel] = useState(null);
   const [classifyingChannel, setClassifyingChannel] = useState(null);
@@ -314,6 +316,14 @@ export default function ChannelsPage() {
                 >
                   <RefreshCw className={clsx('w-4 h-4', syncing && 'animate-spin')} />
                   Sync All
+                </button>
+                <button
+                  onClick={() => setShowSheetSyncModal(true)}
+                  className="btn-secondary text-sm flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 border-emerald-500/30 hover:border-emerald-500/50"
+                  title="Preview and review channels from Dedicated Google Sheet before adding"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Sync Google Sheet
                 </button>
               </>
             )}
@@ -907,6 +917,13 @@ export default function ChannelsPage() {
             </div>
           </div>
         )}
+
+        {/* Google Sheet Sync Review Modal */}
+        <GoogleSheetSyncModal
+          isOpen={showSheetSyncModal}
+          onClose={() => setShowSheetSyncModal(false)}
+          onSuccess={() => fetchChannels(pagination.page)}
+        />
       </div>
     </div>
   );
