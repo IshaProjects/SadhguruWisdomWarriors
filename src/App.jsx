@@ -10,6 +10,7 @@ import ChannelsPage from './pages/ChannelsPage.jsx';
 import ChannelDetailPage from './pages/ChannelDetailPage.jsx';
 import ImportPage from './pages/ImportPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
+import SpreadsheetSyncPage from './pages/SpreadsheetSyncPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import RbacConfigPage from './pages/RbacConfigPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
@@ -89,6 +90,7 @@ export default function App() {
         <Route path="/channels/:id" element={<RbacRoute pageKey="channels"><ChannelDetailPage /></RbacRoute>} />
         <Route path="/micro-units" element={<RbacRoute pageKey="micro-units"><MicroUnitsPage /></RbacRoute>} />
         <Route path="/sync" element={<RbacRoute pageKey="sync"><SyncPage /></RbacRoute>} />
+        <Route path="/spreadsheet-sync" element={<RbacRoute pageKey="sync"><SpreadsheetSyncPage /></RbacRoute>} />
         <Route path="/reports" element={<RbacRoute pageKey="reports"><ReportsPage /></RbacRoute>} />
         <Route path="/ai-studio" element={<RbacRoute pageKey="ai-studio"><AIStudioPage /></RbacRoute>} />
         <Route path="/settings" element={<RbacRoute pageKey="settings"><SettingsPage /></RbacRoute>} />
