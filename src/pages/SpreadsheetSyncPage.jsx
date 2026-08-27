@@ -6,11 +6,14 @@ import toast from 'react-hot-toast';
 
 export default function SpreadsheetSyncPage() {
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [data, setData] = useState(null);
   const [filter, setFilter] = useState('ALL');
+  const [selectedNewChannels, setSelectedNewChannels] = useState(new Set());
 
   const handleSync = async () => {
     setLoading(true);
+    setSelectedNewChannels(new Set());
     try {
       const res = await api.get('/channels/preview-google-sheet-sync');
       setData(res.data);
@@ -23,42 +26,62 @@ export default function SpreadsheetSyncPage() {
     }
   };
 
-  const handleAddChannel = async (item) => {
-    // We will call the standard Add Channel endpoint
-    const toastId = toast.loading('Adding channel...');
+  const handleApplyChanges = async () => {
+    if (!data) return;
+    
+    const newChannels = data.items.filter(i => i.statusState === 'NEW_CHANNEL' && selectedNewChannels.has(i.id));
+    const updatedChannels = data.items.filter(i => i.statusState === 'HANDLE_CHANGED');
+    
+    if (newChannels.length === 0 && updatedChannels.length === 0) {
+      toast.error('No channels selected for import and no handles to update.');
+      return;
+    }
+
+    setApplying(true);
+    const toastId = toast.loading('Applying changes...');
     try {
-      await api.post('/channels', {
-        channelInput: item.youtubeChannelId,
-        category: item.category || 'Uncategorized',
+      const res = await api.post('/channels/import-approved-sheet-channels', {
+        approvedItems: {
+          newChannels,
+          updatedChannels
+        }
       });
-      toast.success('Channel added!', { id: toastId });
-      // Update UI state
-      setData(prev => {
-        if (!prev) return prev;
-        const newItems = prev.items.map(i => i.id === item.id ? { ...i, statusState: 'ALREADY_ADDED' } : i);
-        return { ...prev, items: newItems, summary: { ...prev.summary, newCount: prev.summary.newCount - 1, alreadyAddedCount: prev.summary.alreadyAddedCount + 1 } };
-      });
+      
+      const { importedCount, updatedCount, errors } = res.data;
+      
+      if (errors && errors.length > 0) {
+        toast.error(`Applied with ${errors.length} errors. imported: ${importedCount}, updated: ${updatedCount}`, { id: toastId });
+      } else {
+        toast.success(`Success! Imported ${importedCount} new, updated ${updatedCount} handles.`, { id: toastId });
+      }
+
+      // Re-run the sync preview to reflect updated state
+      handleSync();
+      
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add channel', { id: toastId });
+      toast.error(err.response?.data?.message || 'Failed to apply changes', { id: toastId });
+    } finally {
+      setApplying(false);
     }
   };
 
-  const handleUpdateHandle = async (item) => {
-    const toastId = toast.loading('Updating handle...');
-    try {
-      await api.put(`/channels/${item.dbId}`, {
-        customUrl: item.currentHandle,
-        title: item.name,
-        thumbnailUrl: item.thumbnail
-      });
-      toast.success('Channel updated!', { id: toastId });
-      setData(prev => {
-        if (!prev) return prev;
-        const newItems = prev.items.map(i => i.id === item.id ? { ...i, statusState: 'ALREADY_ADDED' } : i);
-        return { ...prev, items: newItems, summary: { ...prev.summary, handleChangedCount: prev.summary.handleChangedCount - 1, alreadyAddedCount: prev.summary.alreadyAddedCount + 1 } };
-      });
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update channel', { id: toastId });
+  const toggleSelect = (id) => {
+    const newSet = new Set(selectedNewChannels);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedNewChannels(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (!data) return;
+    const newItems = data.items.filter(i => i.statusState === 'NEW_CHANNEL');
+    if (selectedNewChannels.size === newItems.length) {
+      setSelectedNewChannels(new Set());
+    } else {
+      setSelectedNewChannels(new Set(newItems.map(i => i.id)));
     }
   };
 
@@ -66,6 +89,10 @@ export default function SpreadsheetSyncPage() {
     if (filter === 'ALL') return true;
     return item.statusState === filter;
   }) || [];
+
+  const newCount = data?.items?.filter(i => i.statusState === 'NEW_CHANNEL').length || 0;
+  const changedCount = data?.items?.filter(i => i.statusState === 'HANDLE_CHANGED').length || 0;
+  const isAllSelected = newCount > 0 && selectedNewChannels.size === newCount;
 
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-dark-900">
@@ -84,7 +111,7 @@ export default function SpreadsheetSyncPage() {
           </div>
           <button
             onClick={handleSync}
-            disabled={loading}
+            disabled={loading || applying}
             className="btn-primary flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -118,106 +145,88 @@ export default function SpreadsheetSyncPage() {
             </div>
 
             <div className="glass-card flex flex-col">
-              <div className="p-4 border-b border-dark-700 flex gap-2 overflow-x-auto">
-                {['ALL', 'NEW_CHANNEL', 'HANDLE_CHANGED', 'ALREADY_ADDED', 'CHANNEL_NOT_FOUND', 'ERROR'].map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                      filter === f ? 'bg-accent-500/20 text-accent-300' : 'text-dark-300 hover:bg-dark-700'
-                    }`}
-                  >
-                    {f.replace(/_/g, ' ')}
-                  </button>
-                ))}
+              <div className="p-4 border-b border-dark-700 flex justify-between items-center">
+                <div className="flex gap-2 overflow-x-auto">
+                  {['ALL', 'NEW_CHANNEL', 'HANDLE_CHANGED', 'ALREADY_ADDED', 'CHANNEL_NOT_FOUND', 'ERROR'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                        filter === f ? 'bg-accent-500/20 text-accent-300' : 'text-dark-300 hover:bg-dark-700'
+                      }`}
+                    >
+                      {f.replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                </div>
+                
+                {(newCount > 0 || changedCount > 0) && (
+                   <button onClick={handleApplyChanges} disabled={applying} className="btn-primary py-2 px-4 flex items-center gap-2 whitespace-nowrap">
+                     {applying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                     Apply Selected ({selectedNewChannels.size} New, {changedCount} Updates)
+                   </button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
+                <table className="w-full text-left text-sm">
                   <thead className="bg-dark-800/50 text-dark-300">
                     <tr>
+                      <th className="p-4 w-12 text-center">
+                         {filter === 'ALL' || filter === 'NEW_CHANNEL' ? (
+                            <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded border-dark-600 bg-dark-700 text-accent-500 focus:ring-accent-500 focus:ring-offset-dark-900" />
+                         ) : null}
+                      </th>
                       <th className="p-4 font-medium">Channel</th>
                       <th className="p-4 font-medium">Channel ID</th>
-                      <th className="p-4 font-medium">Sheet Tab</th>
-                      <th className="p-4 font-medium">Sync Status</th>
-                      <th className="p-4 font-medium">App Status</th>
+                      <th className="p-4 font-medium">Status</th>
                       <th className="p-4 font-medium">Category</th>
-                      <th className="p-4 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-700/50">
                     {filteredItems.map(item => (
-                      <tr key={item.id} className="hover:bg-dark-700/20 transition-colors">
+                      <tr key={item.id} className={`hover:bg-dark-700/20 transition-colors ${item.statusState === 'NEW_CHANNEL' && selectedNewChannels.has(item.id) ? 'bg-accent-500/5' : ''}`}>
+                        <td className="p-4 text-center">
+                          {item.statusState === 'NEW_CHANNEL' && (
+                             <input type="checkbox" checked={selectedNewChannels.has(item.id)} onChange={() => toggleSelect(item.id)} className="w-4 h-4 rounded border-dark-600 bg-dark-700 text-accent-500 focus:ring-accent-500 focus:ring-offset-dark-900" />
+                          )}
+                        </td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             {item.thumbnail ? (
-                              <img src={item.thumbnail} alt="" className="w-8 h-8 rounded-full bg-dark-700 shrink-0" />
+                              <img src={item.thumbnail} alt="" className="w-8 h-8 rounded-full bg-dark-700" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-dark-700 shrink-0" />
+                              <div className="w-8 h-8 rounded-full bg-dark-700" />
                             )}
-                            <div className="min-w-[150px]">
-                              {item.statusState === 'HANDLE_CHANGED' && item.previousName && item.previousName !== item.name ? (
-                                <div className="font-medium text-dark-100 flex items-center gap-2">
-                                  <span className="line-through text-dark-400">{item.previousName}</span>
-                                  <span className="text-yellow-400">{item.name}</span>
-                                </div>
-                              ) : (
-                                <div className="font-medium text-dark-100">{item.name || 'Unknown'}</div>
-                              )}
-                              
-                              {item.statusState === 'HANDLE_CHANGED' && item.previousHandle !== item.currentHandle ? (
-                                <div className="text-xs text-dark-400 mt-0.5 flex items-center gap-2">
-                                  <span className="line-through">{item.previousHandle}</span>
+                            <div>
+                              <div className="font-medium text-dark-100">{item.name || 'Unknown'}</div>
+                              {item.statusState === 'HANDLE_CHANGED' ? (
+                                <div className="text-xs text-dark-400">
+                                  <span className="line-through mr-2">{item.previousHandle}</span>
                                   <span className="text-yellow-400">{item.currentHandle}</span>
                                 </div>
                               ) : (
-                                <div className="text-xs text-dark-400 mt-0.5 truncate max-w-[200px]">
-                                  {item.currentHandle || item.rawLink}
-                                </div>
+                                <div className="text-xs text-dark-400 truncate max-w-[200px]">{item.currentHandle || item.rawLink}</div>
                               )}
-                              <a href={item.rawLink} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-400 hover:underline block mt-0.5 truncate max-w-[200px]">
-                                {item.rawLink}
-                              </a>
                             </div>
                           </div>
                         </td>
                         <td className="p-4 font-mono text-xs text-dark-300">{item.youtubeChannelId}</td>
-                        <td className="p-4 text-dark-200">
-                          <span className="bg-dark-700/50 px-2.5 py-1 rounded-md border border-dark-600/50">{item.tabName || 'Unknown'}</span>
-                        </td>
                         <td className="p-4">
                           {item.statusState === 'NEW_CHANNEL' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400"><Plus className="w-3.5 h-3.5"/> New</span>}
                           {item.statusState === 'ALREADY_ADDED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400"><CheckCircle className="w-3.5 h-3.5"/> Added</span>}
-                          {item.statusState === 'HANDLE_CHANGED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400"><AlertTriangle className="w-3.5 h-3.5"/> Metadata Changed</span>}
+                          {item.statusState === 'HANDLE_CHANGED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400"><AlertTriangle className="w-3.5 h-3.5"/> Handle Changed</span>}
                           {item.statusState === 'CHANNEL_NOT_FOUND' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><XCircle className="w-3.5 h-3.5"/> Not Found</span>}
                           {item.statusState === 'ERROR' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><AlertTriangle className="w-3.5 h-3.5"/> Error</span>}
                         </td>
-                        <td className="p-4">
-                          {item.appStatus === 'active' && <span className="text-xs text-green-400 font-medium px-2 py-0.5 bg-green-400/10 rounded">Active</span>}
-                          {item.appStatus === 'archived' && <span className="text-xs text-yellow-400 font-medium px-2 py-0.5 bg-yellow-400/10 rounded">Archived</span>}
-                          {item.appStatus === 'deleted' && <span className="text-xs text-red-400 font-medium px-2 py-0.5 bg-red-400/10 rounded">Deleted</span>}
-                          {!item.appStatus && <span className="text-xs text-dark-400">-</span>}
-                        </td>
                         <td className="p-4 text-dark-300">
                           {item.category || '-'}
-                        </td>
-                        <td className="p-4 text-right">
-                          {item.statusState === 'NEW_CHANNEL' && (
-                            <button onClick={() => handleAddChannel(item)} className="btn-primary py-1 px-3 text-xs whitespace-nowrap">
-                              Add Channel
-                            </button>
-                          )}
-                          {item.statusState === 'HANDLE_CHANGED' && (
-                            <button onClick={() => handleUpdateHandle(item)} className="btn-secondary py-1 px-3 text-xs border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 whitespace-nowrap">
-                              Update Channel
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ))}
                     {filteredItems.length === 0 && (
                       <tr>
-                        <td colSpan="7" className="p-8 text-center text-dark-400">
+                        <td colSpan="5" className="p-8 text-center text-dark-400">
                           No channels found matching the selected filter.
                         </td>
                       </tr>
