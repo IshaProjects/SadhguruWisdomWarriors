@@ -24,9 +24,9 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
         setItems(candidateItems);
         setSummary(res.data.summary);
 
-        // Pre-select only brand new channels by default (NEVER pre-select previously deleted)
+        // Pre-select only brand new channels by default
         const initialSelected = new Set(
-          candidateItems.filter((i) => i.statusState === 'new').map((i) => i.id)
+          candidateItems.filter((i) => i.statusState === 'NEW_CHANNEL').map((i) => i.id)
         );
         setSelectedIds(initialSelected);
       } catch (err) {
@@ -60,8 +60,8 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
   };
 
   const toggleSelectAllVisible = () => {
-    const visibleSelectable = filteredItems.filter((i) => i.statusState !== 'active');
-    const allVisibleSelected = visibleSelectable.every((i) => selectedIds.has(i.id));
+    const visibleSelectable = filteredItems.filter((i) => i.statusState === 'NEW_CHANNEL');
+    const allVisibleSelected = visibleSelectable.length > 0 && visibleSelectable.every((i) => selectedIds.has(i.id));
 
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -77,26 +77,29 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
   };
 
   const handleApproveImport = async () => {
-    const approvedItems = items.filter((i) => selectedIds.has(i.id));
-    if (approvedItems.length === 0) {
-      toast.error('Please select at least one channel to import');
+    const newChannels = items.filter((i) => i.statusState === 'NEW_CHANNEL' && selectedIds.has(i.id));
+    const updatedChannels = items.filter((i) => i.statusState === 'HANDLE_CHANGED');
+    
+    if (newChannels.length === 0 && updatedChannels.length === 0) {
+      toast.error('No new channels selected and no handles to update.');
       return;
     }
 
     setImporting(true);
     try {
       const res = await api.post('/channels/import-approved-sheet-channels', {
-        approvedItems,
+        approvedItems: { newChannels, updatedChannels },
       });
 
-      const { addedCount, restoredCount, errors } = res.data;
-      let msg = `Successfully processed ${addedCount + restoredCount} channel(s).`;
-      if (addedCount > 0) msg += ` ${addedCount} added.`;
-      if (restoredCount > 0) msg += ` ${restoredCount} restored.`;
+      const { importedCount, updatedCount, errors } = res.data;
+      let msg = `Successfully processed sync.`;
+      if (importedCount > 0) msg += ` ${importedCount} added.`;
+      if (updatedCount > 0) msg += ` ${updatedCount} handles updated.`;
 
-      toast.success(msg);
       if (errors && errors.length > 0) {
-        toast.error(`Encountered ${errors.length} issue(s) during import.`);
+        toast.error(`Completed with ${errors.length} errors. ${msg}`);
+      } else {
+        toast.success(msg);
       }
 
       onSuccess?.();
@@ -146,7 +149,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
           <div className="flex-1 flex flex-col min-h-0">
 
             {/* Summary Stats Cards */}
-            <div className="p-4 bg-dark-850/50 border-b border-dark-800 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-4 bg-dark-850/50 border-b border-dark-800 grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-dark-800/80 p-3 rounded-lg border border-dark-700/60">
                 <span className="text-xs text-dark-400 block font-medium">Total Sheet Channels</span>
                 <span className="text-lg font-bold text-dark-100">{summary?.totalSheetChannels || items.length}</span>
@@ -156,12 +159,16 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                 <span className="text-lg font-bold text-emerald-300">{summary?.newCount || 0}</span>
               </div>
               <div className="bg-amber-950/30 p-3 rounded-lg border border-amber-700/30">
-                <span className="text-xs text-amber-400 block font-medium">⚠️ Previously Deleted</span>
-                <span className="text-lg font-bold text-amber-300">{summary?.deletedCount || 0}</span>
+                <span className="text-xs text-amber-400 block font-medium">⚠️ Handle Changed</span>
+                <span className="text-lg font-bold text-amber-300">{summary?.handleChangedCount || 0}</span>
               </div>
               <div className="bg-dark-800/50 p-3 rounded-lg border border-dark-700/40">
                 <span className="text-xs text-dark-400 block font-medium">✅ Already Active</span>
-                <span className="text-lg font-bold text-dark-300">{summary?.activeCount || 0}</span>
+                <span className="text-lg font-bold text-dark-300">{summary?.alreadyAddedCount || 0}</span>
+              </div>
+              <div className="bg-red-950/30 p-3 rounded-lg border border-red-700/30">
+                <span className="text-xs text-red-400 block font-medium">❌ Not Found</span>
+                <span className="text-lg font-bold text-red-300">{summary?.notFoundCount || 0}</span>
               </div>
             </div>
 
@@ -197,9 +204,10 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                   className="bg-dark-800 border border-dark-700 text-dark-200 rounded-md px-2.5 py-1 text-xs focus:outline-none focus:border-emerald-500"
                 >
                   <option value="ALL">All Statuses</option>
-                  <option value="new">🆕 New Channels Only</option>
-                  <option value="previously_deleted">⚠️ Previously Deleted Only</option>
-                  <option value="active">✅ Already Active</option>
+                  <option value="NEW_CHANNEL">🆕 New Channels Only</option>
+                  <option value="HANDLE_CHANGED">⚠️ Handle Changed Only</option>
+                  <option value="ALREADY_ADDED">✅ Already Active</option>
+                  <option value="CHANNEL_NOT_FOUND">❌ Not Found</option>
                 </select>
 
                 <button
@@ -233,7 +241,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                     <tbody className="divide-y divide-dark-800 text-dark-200">
                       {filteredItems.map((item) => {
                         const isSelected = selectedIds.has(item.id);
-                        const isDisabled = item.statusState === 'active';
+                        const isDisabled = item.statusState !== 'NEW_CHANNEL';
 
                         return (
                           <tr
@@ -246,13 +254,15 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                           >
                             {/* Checkbox */}
                             <td className="p-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                disabled={isDisabled}
-                                onChange={() => toggleSelect(item.id)}
-                                className="w-4 h-4 rounded border-dark-600 text-emerald-500 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed"
-                              />
+                              {item.statusState === 'NEW_CHANNEL' && (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  disabled={isDisabled}
+                                  onChange={() => toggleSelect(item.id)}
+                                  className="w-4 h-4 rounded border-dark-600 text-emerald-500 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed"
+                                />
+                              )}
                             </td>
 
                             {/* Tab / Category */}
@@ -287,19 +297,24 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
 
                             {/* Status Badge */}
                             <td className="p-3 whitespace-nowrap">
-                              {item.statusState === 'new' && (
+                              {item.statusState === 'NEW_CHANNEL' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                                   <PlusCircle className="w-3 h-3" /> New Channel
                                 </span>
                               )}
-                              {item.statusState === 'previously_deleted' && (
+                              {item.statusState === 'HANDLE_CHANGED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                  <AlertTriangle className="w-3 h-3" /> Previously Deleted
+                                  <AlertTriangle className="w-3 h-3" /> Handle Changed
                                 </span>
                               )}
-                              {item.statusState === 'active' && (
+                              {item.statusState === 'ALREADY_ADDED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-dark-800 text-dark-400 border border-dark-700">
                                   <CheckCircle2 className="w-3 h-3" /> Already Active
+                                </span>
+                              )}
+                              {item.statusState === 'CHANNEL_NOT_FOUND' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
+                                  <AlertTriangle className="w-3 h-3" /> Not Found
                                 </span>
                               )}
                             </td>
