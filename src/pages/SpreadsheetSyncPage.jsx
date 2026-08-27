@@ -133,12 +133,14 @@ export default function SpreadsheetSyncPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-dark-800/50 text-dark-300">
                     <tr>
                       <th className="p-4 font-medium">Channel</th>
                       <th className="p-4 font-medium">Channel ID</th>
-                      <th className="p-4 font-medium">Status</th>
+                      <th className="p-4 font-medium">Sheet Tab</th>
+                      <th className="p-4 font-medium">Sync Status</th>
+                      <th className="p-4 font-medium">App Status</th>
                       <th className="p-4 font-medium">Category</th>
                       <th className="p-4 font-medium text-right">Action</th>
                     </tr>
@@ -149,43 +151,65 @@ export default function SpreadsheetSyncPage() {
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             {item.thumbnail ? (
-                              <img src={item.thumbnail} alt="" className="w-8 h-8 rounded-full bg-dark-700" />
+                              <img src={item.thumbnail} alt="" className="w-8 h-8 rounded-full bg-dark-700 shrink-0" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-dark-700" />
+                              <div className="w-8 h-8 rounded-full bg-dark-700 shrink-0" />
                             )}
-                            <div>
-                              <div className="font-medium text-dark-100">{item.name || 'Unknown'}</div>
-                              {item.statusState === 'HANDLE_CHANGED' ? (
-                                <div className="text-xs text-dark-400">
-                                  <span className="line-through mr-2">{item.previousHandle}</span>
+                            <div className="min-w-[150px]">
+                              {item.statusState === 'HANDLE_CHANGED' && item.previousName && item.previousName !== item.name ? (
+                                <div className="font-medium text-dark-100 flex items-center gap-2">
+                                  <span className="line-through text-dark-400">{item.previousName}</span>
+                                  <span className="text-yellow-400">{item.name}</span>
+                                </div>
+                              ) : (
+                                <div className="font-medium text-dark-100">{item.name || 'Unknown'}</div>
+                              )}
+                              
+                              {item.statusState === 'HANDLE_CHANGED' && item.previousHandle !== item.currentHandle ? (
+                                <div className="text-xs text-dark-400 mt-0.5 flex items-center gap-2">
+                                  <span className="line-through">{item.previousHandle}</span>
                                   <span className="text-yellow-400">{item.currentHandle}</span>
                                 </div>
                               ) : (
-                                <div className="text-xs text-dark-400 truncate max-w-[200px]">{item.currentHandle || item.rawLink}</div>
+                                <div className="text-xs text-dark-400 mt-0.5 truncate max-w-[200px]">
+                                  {item.currentHandle || item.rawLink}
+                                </div>
                               )}
+                              <a href={item.rawLink} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-400 hover:underline block mt-0.5 truncate max-w-[200px]">
+                                {item.rawLink}
+                              </a>
                             </div>
                           </div>
                         </td>
                         <td className="p-4 font-mono text-xs text-dark-300">{item.youtubeChannelId}</td>
+                        <td className="p-4 text-dark-200">
+                          <span className="bg-dark-700/50 px-2.5 py-1 rounded-md border border-dark-600/50">{item.tabName || 'Unknown'}</span>
+                        </td>
                         <td className="p-4">
                           {item.statusState === 'NEW_CHANNEL' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400"><Plus className="w-3.5 h-3.5"/> New</span>}
                           {item.statusState === 'ALREADY_ADDED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400"><CheckCircle className="w-3.5 h-3.5"/> Added</span>}
-                          {item.statusState === 'HANDLE_CHANGED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400"><AlertTriangle className="w-3.5 h-3.5"/> Changed</span>}
+                          {item.statusState === 'HANDLE_CHANGED' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400"><AlertTriangle className="w-3.5 h-3.5"/> Metadata Changed</span>}
                           {item.statusState === 'CHANNEL_NOT_FOUND' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><XCircle className="w-3.5 h-3.5"/> Not Found</span>}
                           {item.statusState === 'ERROR' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><AlertTriangle className="w-3.5 h-3.5"/> Error</span>}
+                        </td>
+                        <td className="p-4">
+                          {item.appStatus === 'active' && <span className="text-xs text-green-400 font-medium px-2 py-0.5 bg-green-400/10 rounded">Active</span>}
+                          {item.appStatus === 'archived' && <span className="text-xs text-yellow-400 font-medium px-2 py-0.5 bg-yellow-400/10 rounded">Archived</span>}
+                          {item.appStatus === 'deleted' && <span className="text-xs text-red-400 font-medium px-2 py-0.5 bg-red-400/10 rounded">Deleted</span>}
+                          {!item.appStatus && <span className="text-xs text-dark-400">-</span>}
                         </td>
                         <td className="p-4 text-dark-300">
                           {item.category || '-'}
                         </td>
                         <td className="p-4 text-right">
                           {item.statusState === 'NEW_CHANNEL' && (
-                            <button onClick={() => handleAddChannel(item)} className="btn-primary py-1 px-3 text-xs">
+                            <button onClick={() => handleAddChannel(item)} className="btn-primary py-1 px-3 text-xs whitespace-nowrap">
                               Add Channel
                             </button>
                           )}
                           {item.statusState === 'HANDLE_CHANGED' && (
-                            <button onClick={() => handleUpdateHandle(item)} className="btn-secondary py-1 px-3 text-xs border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10">
-                              Update Handle
+                            <button onClick={() => handleUpdateHandle(item)} className="btn-secondary py-1 px-3 text-xs border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 whitespace-nowrap">
+                              Update Channel
                             </button>
                           )}
                         </td>
@@ -193,7 +217,7 @@ export default function SpreadsheetSyncPage() {
                     ))}
                     {filteredItems.length === 0 && (
                       <tr>
-                        <td colSpan="5" className="p-8 text-center text-dark-400">
+                        <td colSpan="7" className="p-8 text-center text-dark-400">
                           No channels found matching the selected filter.
                         </td>
                       </tr>
