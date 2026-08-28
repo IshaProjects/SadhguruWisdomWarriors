@@ -159,7 +159,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                 <span className="text-lg font-bold text-emerald-300">{summary?.newCount || 0}</span>
               </div>
               <div className="bg-amber-950/30 p-3 rounded-lg border border-amber-700/30">
-                <span className="text-xs text-amber-400 block font-medium">⚠️ Handle Changed</span>
+                <span className="text-xs text-amber-400 block font-medium">⚠️ Channel handle updated</span>
                 <span className="text-lg font-bold text-amber-300">{summary?.handleChangedCount || 0}</span>
               </div>
               <div className="bg-dark-800/50 p-3 rounded-lg border border-dark-700/40">
@@ -205,7 +205,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="NEW_CHANNEL">🆕 New Channels Only</option>
-                  <option value="HANDLE_CHANGED">⚠️ Handle Changed Only</option>
+                  <option value="HANDLE_CHANGED">⚠️ Channel handle updated</option>
                   <option value="ALREADY_ADDED">✅ Already Active</option>
                   <option value="CHANNEL_NOT_FOUND">❌ Not Found</option>
                 </select>
@@ -271,21 +271,21 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                               <span className="text-[11px] text-emerald-400/90 font-medium block">{item.category}</span>
                             </td>
 
-                            {/* Sheet Name */}
-                            <td className="p-3 font-medium text-dark-100 max-w-[200px] truncate" title={item.nameInSheet}>
-                              {item.nameInSheet}
+                            {/* Sheet Name / Channel Name */}
+                            <td className="p-3 font-medium text-dark-100 max-w-[200px] truncate" title={item.name || item.nameInSheet}>
+                              {item.name || item.nameInSheet}
                             </td>
 
                             {/* Clickable YouTube Link */}
                             <td className="p-3 max-w-[250px]">
                               <a
-                                href={item.cleanUrl}
+                                href={item.rawLink || item.cleanUrl || (item.youtubeChannelId && item.youtubeChannelId !== 'UNRESOLVED' ? `https://youtube.com/channel/${item.youtubeChannelId}` : '#')}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 font-mono text-[11px] truncate"
                                 title="Click to test & open channel on YouTube"
                               >
-                                {item.cleanUrl}
+                                {item.rawLink || item.cleanUrl || 'YouTube Link'}
                                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
                               </a>
                             </td>
@@ -304,7 +304,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                               )}
                               {item.statusState === 'HANDLE_CHANGED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                  <AlertTriangle className="w-3 h-3" /> Handle Changed
+                                  <AlertTriangle className="w-3 h-3" /> Channel handle updated
                                 </span>
                               )}
                               {item.statusState === 'ALREADY_ADDED' && (
