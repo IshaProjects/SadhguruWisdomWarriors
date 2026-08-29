@@ -4,6 +4,21 @@ import api from '../../services/api.js';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
+export function getNormalizedStatus(item) {
+  const s = String(item.statusState || item.appStatus || item.status || '').toUpperCase().trim();
+  if (s === 'NEW_CHANNEL' || s === 'NEW') return 'NEW_CHANNEL';
+  if (s === 'HANDLE_CHANGED' || s === 'HANDLE_UPDATED' || s === 'UPDATED') return 'HANDLE_CHANGED';
+  if (s === 'ALREADY_ADDED' || s === 'ACTIVE' || s === 'ALREADY_ACTIVE') return 'ALREADY_ADDED';
+  if (s === 'CHANNEL_TERMINATED' || s === 'TERMINATED' || s === 'PREVIOUSLY_DELETED' || s === 'DELETED') return 'CHANNEL_TERMINATED';
+  if (s === 'CHANNEL_NOT_FOUND' || s === 'NOT_FOUND' || s === 'UNRESOLVED') return 'CHANNEL_NOT_FOUND';
+  if (s === 'ERROR') return 'ERROR';
+
+  if (item.dbId || (item.youtubeChannelId && item.youtubeChannelId !== 'UNRESOLVED')) {
+    return 'ALREADY_ADDED';
+  }
+  return 'CHANNEL_NOT_FOUND';
+}
+
 export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
@@ -38,8 +53,9 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      const normStatus = getNormalizedStatus(item);
       if (activeTabFilter !== 'ALL' && item.tabName !== activeTabFilter) return false;
-      if (activeStatusFilter !== 'ALL' && item.statusState !== activeStatusFilter) return false;
+      if (activeStatusFilter !== 'ALL' && normStatus !== activeStatusFilter) return false;
       return true;
     });
   }, [items, activeTabFilter, activeStatusFilter]);
@@ -57,7 +73,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
   };
 
   const toggleSelectAllVisible = () => {
-    const visibleSelectable = filteredItems.filter((i) => i.statusState === 'NEW_CHANNEL');
+    const visibleSelectable = filteredItems.filter((i) => getNormalizedStatus(i) === 'NEW_CHANNEL');
     const allVisibleSelected = visibleSelectable.length > 0 && visibleSelectable.every((i) => selectedIds.has(i.id));
 
     setSelectedIds((prev) => {
@@ -238,8 +254,9 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                     </thead>
                     <tbody className="divide-y divide-dark-800 text-dark-200">
                       {filteredItems.map((item) => {
+                        const normStatus = getNormalizedStatus(item);
                         const isSelected = selectedIds.has(item.id);
-                        const isDisabled = item.statusState !== 'NEW_CHANNEL';
+                        const isDisabled = normStatus !== 'NEW_CHANNEL';
 
                         return (
                           <tr
@@ -252,7 +269,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                           >
                             {/* Checkbox */}
                             <td className="p-3 text-center">
-                              {item.statusState === 'NEW_CHANNEL' && (
+                              {normStatus === 'NEW_CHANNEL' && (
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -295,29 +312,29 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
 
                             {/* Status Badge */}
                             <td className="p-3 whitespace-nowrap">
-                              {item.statusState === 'NEW_CHANNEL' && (
+                              {normStatus === 'NEW_CHANNEL' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                                   <PlusCircle className="w-3 h-3" /> New Channel
                                 </span>
                               )}
-                              {item.statusState === 'HANDLE_CHANGED' && (
+                              {normStatus === 'HANDLE_CHANGED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30">
                                   <AlertTriangle className="w-3 h-3" /> Channel handle updated
                                 </span>
                               )}
-                              {item.statusState === 'ALREADY_ADDED' && (
+                              {normStatus === 'ALREADY_ADDED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-dark-800 text-dark-400 border border-dark-700">
                                   <CheckCircle2 className="w-3 h-3" /> Already Active
                                 </span>
                               )}
-                              {item.statusState === 'CHANNEL_NOT_FOUND' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
-                                  <AlertTriangle className="w-3 h-3" /> Not Found
-                                </span>
-                              )}
-                              {item.statusState === 'CHANNEL_TERMINATED' && (
+                              {normStatus === 'CHANNEL_TERMINATED' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
                                   <AlertTriangle className="w-3 h-3" /> Terminated / Deleted
+                                </span>
+                              )}
+                              {(normStatus === 'CHANNEL_NOT_FOUND' || normStatus === 'ERROR') && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
+                                  <AlertTriangle className="w-3 h-3" /> Not Found
                                 </span>
                               )}
                             </td>
