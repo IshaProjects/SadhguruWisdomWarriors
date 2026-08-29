@@ -182,23 +182,23 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
             <div className="p-4 bg-dark-850/50 border-b border-dark-800 grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-dark-800/80 p-3 rounded-lg border border-dark-700/60">
                 <span className="text-xs text-dark-400 block font-medium">Total Sheet Channels</span>
-                <span className="text-lg font-bold text-dark-100">{summary?.totalSheetChannels || items.length}</span>
+                <span className="text-lg font-bold text-dark-100">{items.length}</span>
               </div>
               <div className="bg-emerald-950/30 p-3 rounded-lg border border-emerald-700/30">
                 <span className="text-xs text-emerald-400 block font-medium">🆕 New Channels</span>
-                <span className="text-lg font-bold text-emerald-300">{summary?.newCount || 0}</span>
+                <span className="text-lg font-bold text-emerald-300">{items.filter((i) => getNormalizedStatus(i) === 'NEW_CHANNEL').length}</span>
               </div>
               <div className="bg-amber-950/30 p-3 rounded-lg border border-amber-700/30">
                 <span className="text-xs text-amber-400 block font-medium">⚠️ Channel handle updated</span>
-                <span className="text-lg font-bold text-amber-300">{summary?.handleChangedCount || 0}</span>
+                <span className="text-lg font-bold text-amber-300">{items.filter((i) => getNormalizedStatus(i) === 'HANDLE_CHANGED').length}</span>
               </div>
               <div className="bg-dark-800/50 p-3 rounded-lg border border-dark-700/40">
                 <span className="text-xs text-dark-400 block font-medium">✅ Already Active</span>
-                <span className="text-lg font-bold text-dark-300">{summary?.alreadyAddedCount || 0}</span>
+                <span className="text-lg font-bold text-dark-300">{items.filter((i) => getNormalizedStatus(i) === 'ALREADY_ADDED').length}</span>
               </div>
               <div className="bg-red-950/30 p-3 rounded-lg border border-red-700/30">
                 <span className="text-xs text-red-400 block font-medium">❌ Not Found / Terminated</span>
-                <span className="text-lg font-bold text-red-300">{(summary?.notFoundCount || 0) + (summary?.terminatedCount || 0)}</span>
+                <span className="text-lg font-bold text-red-300">{items.filter((i) => ['CHANNEL_NOT_FOUND', 'CHANNEL_TERMINATED', 'ERROR'].includes(getNormalizedStatus(i))).length}</span>
               </div>
             </div>
 
