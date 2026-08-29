@@ -164,8 +164,8 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                 <span className="text-lg font-bold text-dark-300">{summary?.alreadyAddedCount || 0}</span>
               </div>
               <div className="bg-red-950/30 p-3 rounded-lg border border-red-700/30">
-                <span className="text-xs text-red-400 block font-medium">❌ Not Found</span>
-                <span className="text-lg font-bold text-red-300">{summary?.notFoundCount || 0}</span>
+                <span className="text-xs text-red-400 block font-medium">❌ Not Found / Terminated</span>
+                <span className="text-lg font-bold text-red-300">{(summary?.notFoundCount || 0) + (summary?.terminatedCount || 0)}</span>
               </div>
             </div>
 
@@ -204,7 +204,8 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                   <option value="NEW_CHANNEL">🆕 New Channels Only</option>
                   <option value="HANDLE_CHANGED">⚠️ Channel handle updated</option>
                   <option value="ALREADY_ADDED">✅ Already Active</option>
-                  <option value="CHANNEL_NOT_FOUND">❌ Not Found</option>
+                  <option value="CHANNEL_TERMINATED">❌ Terminated / Deleted</option>
+                  <option value="CHANNEL_NOT_FOUND">❓ Not Found</option>
                 </select>
 
                 <button
@@ -312,6 +313,11 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                               {item.statusState === 'CHANNEL_NOT_FOUND' && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
                                   <AlertTriangle className="w-3 h-3" /> Not Found
+                                </span>
+                              )}
+                              {item.statusState === 'CHANNEL_TERMINATED' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/30">
+                                  <AlertTriangle className="w-3 h-3" /> Terminated / Deleted
                                 </span>
                               )}
                             </td>
