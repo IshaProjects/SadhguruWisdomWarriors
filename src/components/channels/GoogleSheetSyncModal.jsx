@@ -24,11 +24,8 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
         setItems(candidateItems);
         setSummary(res.data.summary);
 
-        // Pre-select only brand new channels by default
-        const initialSelected = new Set(
-          candidateItems.filter((i) => i.statusState === 'NEW_CHANNEL').map((i) => i.id)
-        );
-        setSelectedIds(initialSelected);
+        // Start with NO channels selected by default so only explicitly checked channels are added
+        setSelectedIds(new Set());
       } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to scan Google Sheet');
       } finally {
@@ -345,18 +342,23 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={handleApproveImport}
-                  disabled={importing || selectedIds.size === 0}
+                  disabled={importing || (selectedIds.size === 0 && !items.some((i) => i.statusState === 'HANDLE_CHANGED'))}
                   className="btn-primary text-xs px-5 py-2 flex items-center gap-2 disabled:opacity-50"
                 >
                   {importing ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      Importing Approved Channels...
+                      Processing Sync...
+                    </>
+                  ) : selectedIds.size > 0 ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Approve & Add Selected Channels ({selectedIds.size})
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      Approve & Add Selected Channels ({selectedIds.size})
+                      Apply Handle Updates ({items.filter((i) => i.statusState === 'HANDLE_CHANGED').length})
                     </>
                   )}
                 </button>
