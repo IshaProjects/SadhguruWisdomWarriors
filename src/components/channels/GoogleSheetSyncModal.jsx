@@ -4,6 +4,23 @@ import api from '../../services/api.js';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
+export function formatExternalLink(rawLink, youtubeChannelId) {
+  let link = (rawLink || '').trim();
+  if (link) {
+    if (link.startsWith('@')) {
+      return `https://www.youtube.com/${link}`;
+    }
+    if (!link.startsWith('http://') && !link.startsWith('https://')) {
+      return `https://${link.replace(/^\/+/, '')}`;
+    }
+    return link;
+  }
+  if (youtubeChannelId && youtubeChannelId !== 'UNRESOLVED') {
+    return `https://www.youtube.com/channel/${youtubeChannelId}`;
+  }
+  return '#';
+}
+
 export function getNormalizedStatus(item) {
   const s = String(item.statusState || item.appStatus || item.status || '').toUpperCase().trim();
   if (s === 'NEW_CHANNEL' || s === 'NEW') return 'NEW_CHANNEL';
@@ -293,16 +310,22 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
 
                             {/* Clickable YouTube Link */}
                             <td className="p-3 max-w-[250px]">
-                              <a
-                                href={item.rawLink || item.cleanUrl || (item.youtubeChannelId && item.youtubeChannelId !== 'UNRESOLVED' ? `https://youtube.com/channel/${item.youtubeChannelId}` : '#')}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 font-mono text-[11px] truncate"
-                                title="Click to test & open channel on YouTube"
-                              >
-                                {item.rawLink || item.cleanUrl || 'YouTube Link'}
-                                <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                              </a>
+                              {formatExternalLink(item.rawLink || item.cleanUrl, item.youtubeChannelId) !== '#' ? (
+                                <a
+                                  href={formatExternalLink(item.rawLink || item.cleanUrl, item.youtubeChannelId)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 font-mono text-[11px] truncate"
+                                  title="Click to test & open channel on YouTube"
+                                >
+                                  {item.rawLink || item.cleanUrl || 'YouTube Link'}
+                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                </a>
+                              ) : (
+                                <span className="text-dark-400 font-mono text-[11px] truncate">
+                                  {item.rawLink || item.cleanUrl || '-'}
+                                </span>
+                              )}
                             </td>
 
                             {/* YouTube Channel ID */}
