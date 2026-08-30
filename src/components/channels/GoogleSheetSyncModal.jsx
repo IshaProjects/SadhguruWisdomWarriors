@@ -37,6 +37,7 @@ export function getNormalizedStatus(item) {
 }
 
 export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
+  const [sheetType, setSheetType] = useState('dedicated');
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -51,7 +52,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
     const fetchPreview = async () => {
       setLoading(true);
       try {
-        const res = await api.get('/channels/preview-google-sheet-sync');
+        const res = await api.get(`/channels/preview-google-sheet-sync?sheetType=${sheetType}`);
         const candidateItems = res.data.items || [];
         setItems(candidateItems);
         setSummary(res.data.summary);
@@ -66,7 +67,7 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
     };
 
     fetchPreview();
-  }, [isOpen]);
+  }, [isOpen, sheetType]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -148,22 +149,53 @@ export default function GoogleSheetSyncModal({ isOpen, onClose, onSuccess }) {
       <div className="bg-dark-900 border border-dark-700 rounded-xl w-full max-w-6xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-dark-700 bg-dark-850">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-5 border-b border-dark-700 bg-dark-850 gap-3">
           <div>
             <h2 className="text-xl font-semibold text-dark-100 flex items-center gap-2">
               <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">📊</span>
-              Google Sheet Sync — Pre-Import Review
+              Google Sheet Sync — {sheetType === 'dedicated' ? 'Dedicated Database' : 'IHI Master Database'}
             </h2>
             <p className="text-xs text-dark-400 mt-1">
-              Review channels from Dedicated Google Sheet tabs before adding. Test links, verify active state, and approve.
+              {sheetType === 'dedicated'
+                ? 'Review channels from Dedicated Google Sheet tabs before adding. All dedicated channels automatically receive green checkmark (✓).'
+                : 'Review channels from IHI Master Database tabs before adding. IHI channels display with (—) until AI classification.'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-dark-400 hover:text-dark-100 rounded-lg hover:bg-dark-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {/* Sheet Switcher */}
+            <div className="flex bg-dark-800 p-1 rounded-lg border border-dark-700 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setSheetType('dedicated')}
+                className={clsx(
+                  'px-3 py-1.5 rounded-md transition flex items-center gap-1.5',
+                  sheetType === 'dedicated'
+                    ? 'bg-emerald-500 text-dark-950 font-bold shadow-sm'
+                    : 'text-dark-300 hover:text-dark-100 hover:bg-dark-700/50'
+                )}
+              >
+                Dedicated Sheet
+              </button>
+              <button
+                type="button"
+                onClick={() => setSheetType('ihi')}
+                className={clsx(
+                  'px-3 py-1.5 rounded-md transition flex items-center gap-1.5',
+                  sheetType === 'ihi'
+                    ? 'bg-emerald-500 text-dark-950 font-bold shadow-sm'
+                    : 'text-dark-300 hover:text-dark-100 hover:bg-dark-700/50'
+                )}
+              >
+                IHI Master Database
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-dark-400 hover:text-dark-100 rounded-lg hover:bg-dark-800 transition ml-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
