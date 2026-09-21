@@ -25,12 +25,17 @@ export default function ChannelCard({ channel, onClassify }) {
           className="w-12 h-12 rounded-full object-cover bg-dark-700 shrink-0"
         />
         <div className="min-w-0 flex-1">
-          <h3 className="font-medium truncate group-hover:text-accent-400 transition-colors">
+          <h3 className="font-medium truncate group-hover:text-accent-400 transition-colors" title={channel.title}>
             {channel.title}
           </h3>
           <p className="text-xs text-dark-400 truncate">
             {channel.customUrl || channel.youtubeChannelId}
           </p>
+          {channel.notes && channel.notes.includes('Formerly:') && (
+            <p className="text-[10px] text-dark-400/80 italic truncate" title={channel.notes}>
+              {channel.notes.split('|').find(p => p.includes('Formerly:'))?.trim()}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {channel.classificationDone && (

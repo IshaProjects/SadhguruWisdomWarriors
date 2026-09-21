@@ -31,8 +31,13 @@ export default function AddChannelModal({ open, onClose, onAdded }) {
         tags: tags ? tags.split(',').map((t) => t.trim()) : [],
         notes,
       });
-      toast.success(`Added: ${res.data.title}`);
-      onAdded?.(res.data);
+      if (res.data.alreadyTracked) {
+        toast.success(res.data.message || `Channel updated to ${res.data.channel?.title}`, { duration: 5000 });
+        onAdded?.(res.data.channel);
+      } else {
+        toast.success(`Added: ${res.data.title}`);
+        onAdded?.(res.data);
+      }
       setChannelInput('');
       setCategory('Uncategorized');
       setTags('');

@@ -91,8 +91,13 @@ export default function ChannelTable({
                       className="w-9 h-9 rounded-full object-cover bg-dark-700 shrink-0"
                     />
                     <div className="min-w-0">
-                      <p className="font-medium truncate max-w-[200px]">{ch.title}</p>
+                      <p className="font-medium truncate max-w-[200px]" title={ch.title}>{ch.title}</p>
                       <p className="text-xs text-dark-400 truncate">{ch.customUrl || ch.youtubeChannelId}</p>
+                      {ch.notes && ch.notes.includes('Formerly:') && (
+                        <p className="text-[10px] text-dark-400/80 italic truncate max-w-[200px]" title={ch.notes}>
+                          {ch.notes.split('|').find(p => p.includes('Formerly:'))?.trim()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </td>
